@@ -1,0 +1,122 @@
+:root{
+  --bg:#000; --fg:#f5f5f7; --muted:rgba(235,235,245,.5); --faint:rgba(235,235,245,.2);
+  --line:rgba(255,255,255,.1); --tile:#121214; --green:#30d158; --red:#ff453a;
+  --spring:linear(0, 0.006, 0.025 2.8%, 0.101 6.1%, 0.539 18.9%, 0.721 25.3%, 0.849 31.5%, 0.937 38.1%, 0.968 41.8%, 0.991 45.7%, 1.006 50.1%, 1.015 55%, 1.017 63.9%, 1.001 85.5%, 1);
+  --bounce:linear(0, 0.45 15%, 1.08 35%, 0.97 55%, 1.01 75%, 1);
+  color-scheme:dark;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+[hidden]{display:none!important}
+html,body{height:100%;background:transparent;overflow:hidden}
+body{font:400 16px/1.4 "Inter","Segoe UI Variable Display","Segoe UI",system-ui,sans-serif;font-feature-settings:"cv11","ss01","ss03";color:var(--fg);-webkit-font-smoothing:antialiased;padding:2px}
+button,input{font:inherit;color:inherit;background:none;border:0}
+button{cursor:pointer}
+
+/* the window: plain black */
+.win{position:relative;height:100%;border-radius:28px;background:var(--bg);overflow:hidden;
+  box-shadow:0 0 0 1px rgba(255,255,255,.14) inset;animation:winIn .8s var(--spring) both}   /* no outer shadow: Windows would clip it into a square */
+@keyframes winIn{from{opacity:0;transform:scale(.97)}}
+.win.bye{animation:winOut .5s cubic-bezier(.4,0,.2,1) both}
+@keyframes winOut{to{opacity:0;transform:scale(.95)}}
+.drag{position:absolute;inset:0 0 auto 0;height:64px;-webkit-app-region:drag}
+.x{position:absolute;top:18px;right:20px;width:32px;height:32px;border-radius:50%;color:var(--muted);font-size:13px;z-index:5;-webkit-app-region:no-drag;transition:background .2s,color .2s}
+.x:hover{background:var(--tile);color:var(--fg)}
+
+/* the empty slot at the top: Jarvis isn't here yet; the dots fill as you go */
+.slot{position:absolute;left:50%;top:22px;width:168px;height:40px;margin-left:-84px;border-radius:20px;z-index:2;
+  border:1.5px dashed rgba(255,255,255,.22);transition:border-color .5s,opacity .4s,transform .6s var(--spring)}
+.slot .dots{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:7px}
+.slot .dots i{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.16);transition:background .4s,transform .5s var(--bounce)}
+.slot .dots i.on{background:#fff}
+.slot .dots i.cur{background:rgba(255,255,255,.6);animation:breathe 1.6s ease-in-out infinite}
+@keyframes breathe{50%{transform:scale(1.5)}}
+.slot.full{transform:scale(1.05)}
+.slot.gone{opacity:0}
+
+/* Jarvis itself, dropping into the slot at the end */
+.isle{position:absolute;left:50%;top:22px;width:168px;height:40px;margin-left:-84px;border-radius:20px;background:#000;z-index:3;
+  display:flex;align-items:center;gap:10px;padding:0 16px;cursor:grab;touch-action:none;opacity:0;pointer-events:none;
+  box-shadow:0 0 0 1px rgba(255,255,255,.28)}
+.isle .eye{width:8px;height:8px;border-radius:50%;background:rgba(235,235,245,.4)}
+.isle .hi{font-size:14px;font-weight:500;color:rgba(235,235,245,.8)}
+.isle.on{opacity:1;pointer-events:auto;animation:drop 1.1s var(--spring) both}
+@keyframes drop{
+  0%{transform:translateY(-70px) scaleX(.35) scaleY(1.6);border-radius:50%;opacity:0}
+  35%{transform:translateY(6px) scaleX(1.18) scaleY(.78);border-radius:20px;opacity:1}
+  60%{transform:translateY(-2px) scaleX(.94) scaleY(1.08)}
+  80%{transform:translateY(1px) scaleX(1.02) scaleY(.98)}
+  100%{transform:none}}
+.isle.on:hover{transform:scale(1.06);transition:transform .4s var(--bounce)}
+.isle.on .eye{animation:blink 4s 1.4s infinite}
+@keyframes blink{0%,94%,100%{transform:none}97%{transform:scaleY(.15)}}
+.isle.grabbed{opacity:0!important;transform:scale(.6)!important;transition:opacity .15s,transform .2s;animation:none}
+.isle.back{animation:back .8s var(--bounce) both}
+@keyframes back{from{transform:translateY(-30px) scale(.7);opacity:0}}
+.isle.wiggle{animation:wiggle .7s var(--bounce)}
+@keyframes wiggle{20%{transform:rotate(-4deg) scaleX(1.06)}40%{transform:rotate(3deg)}60%{transform:rotate(-2deg)}}
+
+/* a page: one big line, one action */
+.step{position:absolute;inset:80px 0 40px;display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:0 64px;z-index:1}
+.step.on{display:flex}
+.step.on>*{animation:rise .9s var(--spring) both;animation-delay:calc(var(--i,0) * 80ms + 200ms)}
+.step.leave{display:flex;animation:leave .38s cubic-bezier(.4,0,1,1) both}
+@keyframes rise{from{opacity:0;transform:translateY(24px)}}
+@keyframes leave{to{opacity:0;transform:translateY(-18px) scale(.98)}}
+h1{font-size:68px;font-weight:700;letter-spacing:-.045em;line-height:1.04;max-width:760px;text-wrap:balance}
+.words .w{display:inline-block;white-space:pre}
+.step.on .words .w{animation:word .9s var(--spring) both;animation-delay:calc(var(--k) * 70ms + 120ms)}
+@keyframes word{from{opacity:0;transform:translateY(.4em)}}
+.primary{margin-top:44px;height:56px;padding:0 34px;border-radius:28px;background:var(--fg);color:#000;font-weight:600;font-size:17px;
+  transition:transform .35s var(--bounce),background .3s,color .3s}
+.primary:hover{transform:scale(1.04)}
+.primary:active{transform:scale(.96)}
+.primary:disabled{opacity:.35;transform:none;cursor:default}
+.primary.ok{background:var(--green)}
+.sub{margin-top:14px;color:var(--muted);font-size:15px;font-weight:500;padding:8px 12px;border-radius:12px;transition:color .2s}
+.sub:hover{color:var(--fg)}
+.how{position:absolute;bottom:4px;left:50%;transform:translateX(-50%);color:var(--faint);font-size:13.5px;text-decoration:underline;text-underline-offset:4px;transition:color .2s}
+.how:hover{color:var(--muted)}
+:focus-visible{outline:2px solid #0a84ff;outline-offset:3px}
+
+/* the one input on a page: big, no box, just a line */
+.big{margin-top:36px;width:min(520px,100%);height:58px;border-bottom:2px solid var(--line);font-size:26px;font-weight:500;text-align:center;outline:none;letter-spacing:-.01em;transition:border-color .3s}
+.big::placeholder{color:rgba(235,235,245,.22)}
+.big:focus{border-color:rgba(255,255,255,.6)}
+.big.good{border-color:var(--green)}
+.big.bad{border-color:var(--red);animation:shake .4s}
+@keyframes shake{25%{transform:translateX(-6px)}50%{transform:translateX(5px)}75%{transform:translateX(-2px)}}
+.pair{display:flex;gap:24px;width:min(640px,100%)}
+.pair .big{flex:1;min-width:0;font-size:22px}
+.res{margin-top:14px;min-height:22px;font-size:15px;color:var(--muted)}
+.res.good{color:var(--green)} .res.bad{color:#ff8a80}
+.res+.primary{margin-top:26px}
+
+/* the voice: a black drop with a white rim that breathes with your voice */
+.voice{position:relative;width:110px;height:110px;margin-bottom:34px}
+.voice i{position:absolute;inset:0;border-radius:42% 58% 55% 45% / 48% 42% 58% 52%;background:#000;box-shadow:0 0 0 1.5px rgba(255,255,255,.5);
+  transform:scale(calc(.85 + var(--lvl,0) * .4));transition:transform .08s linear;animation:morph 7s ease-in-out infinite}
+.voice i:nth-child(2){opacity:0;box-shadow:0 0 0 1.5px rgba(255,255,255,.35);animation:ripple 2.2s ease-out infinite}
+.voice.live i:nth-child(2){opacity:1}
+.voice.heard i:first-child{box-shadow:0 0 0 2px var(--green)}
+@keyframes morph{25%{border-radius:58% 42% 45% 55% / 52% 58% 42% 48%}50%{border-radius:50% 50% 38% 62% / 40% 55% 45% 60%}75%{border-radius:45% 55% 60% 40% / 58% 44% 56% 42%}}
+@keyframes ripple{from{transform:scale(.9);opacity:.7}to{transform:scale(1.6);opacity:0}}
+
+/* finale */
+.finale .arrow{width:44px;height:66px;margin-top:40px;fill:none;stroke:rgba(255,255,255,.5);stroke-width:3;stroke-linecap:round;stroke-linejoin:round;
+  stroke-dasharray:120;animation:draw 1.8s .9s ease-in-out infinite}
+@keyframes draw{0%{stroke-dashoffset:120;opacity:0}20%{opacity:1}60%{stroke-dashoffset:0;opacity:1}100%{stroke-dashoffset:0;opacity:0}}
+.finale .sub{margin-top:30px}
+.hear{position:absolute;bottom:8px;left:0;right:0;font-size:13px;color:var(--faint)}
+
+/* how-to sheet: slides up over the page */
+.sheet{position:absolute;inset:auto 24px 24px;z-index:6;background:var(--tile);border-radius:24px;padding:28px 32px;text-align:center;
+  box-shadow:0 0 0 .5px var(--line) inset;animation:sheet .6s var(--spring) both}
+@keyframes sheet{from{transform:translateY(110%)}}
+.sheet p{font-size:17px;line-height:1.55;color:rgba(235,235,245,.85);max-width:640px;margin:0 auto}
+.sheet p b{color:var(--fg);font-weight:600}
+.sheet code{font:15px "Cascadia Code",Consolas,monospace;color:var(--fg);background:#000;padding:2px 8px;border-radius:6px;cursor:copy}
+.sheet .primary{margin-top:22px;height:46px;font-size:15px}
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+}

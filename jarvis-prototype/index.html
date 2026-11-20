@@ -1,0 +1,849 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Island Prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --font:"Inter";
+    --ink:#000; --fg:#f5f5f7; --fg2:rgba(235,235,245,.78); --muted:rgba(235,235,245,.6); --faint:rgba(235,235,245,.3); --line:rgba(84,84,88,.45); --tile:#1c1c1e; --tile2:#2c2c2e;
+    --red:#ff3b30; --green:#30d158; --orange:#ff9f0a; --blue:#0a84ff;
+    --ease:cubic-bezier(.2,.8,.2,1);
+    --spring:linear(0, 0.45 15%, 1.08 35%, 0.97 55%, 1.01 75%, 1);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  [hidden]{display:none!important}
+  html{background:#c4cdd8}
+  body{min-height:100%}
+  body{font:400 14px/1.45 var(--font),system-ui,sans-serif;font-feature-settings:"cv11","ss01","ss03";color:#1d1d1f;overflow-x:hidden;-webkit-font-smoothing:antialiased;
+    background:radial-gradient(1200px 600px at 50% -10%,#f1f4f8,#d7dee7 55%,#c4cdd8)}
+  button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+
+  /* ---------- island ---------- */
+  #island{position:fixed;z-index:2;background:var(--ink);color:var(--fg);overflow:hidden;cursor:pointer;user-select:none;touch-action:none;
+    box-shadow:0 12px 32px rgba(0,0,0,.18),0 2px 6px rgba(0,0,0,.1),inset 0 0 0 .5px rgba(255,255,255,.07)}
+  #island:focus-visible{outline:2px solid #0a84ff;outline-offset:3px}
+  #island.widget{cursor:default}
+  .layer{position:absolute;left:0;right:0;top:0;opacity:0;transition:opacity .2s var(--ease);pointer-events:none}
+  @media (prefers-reduced-motion:no-preference){.layer{filter:blur(6px);scale:.94;transition:opacity .22s var(--ease),filter .28s var(--ease),scale .4s linear(0, 0.45 15%, 1.08 35%, 0.97 55%, 1.01 75%, 1)}.layer.on{filter:none;scale:1}}
+  #lStatus,#lTimer,#lMusic{bottom:0}
+  .layer.on{opacity:1;pointer-events:auto;transition-delay:.05s}
+  #lHud,#lTask,#lNotif,#lDrop{bottom:0}
+
+  /* status row (listening / thinking / hover) */
+  .status{display:flex;align-items:center;gap:10px;padding:0 18px;height:100%}
+  .light{width:8px;height:8px;border-radius:50%;background:var(--faint);flex:none;transition:background .2s,box-shadow .2s}
+  [data-s=listening] .light{background:var(--red);box-shadow:0 0 10px var(--red)}
+  [data-s=thinking] .light{background:var(--fg);animation:pulse 1s ease-in-out infinite}
+  @keyframes pulse{50%{transform:scale(.5);opacity:.5}}
+  .status .text{flex:1;font-size:13.5px;font-weight:500;color:var(--fg2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  [data-s=thinking] .status .text{background:linear-gradient(90deg,#77777f 0%,#fff 45%,#77777f 90%);background-size:200% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:shimmer 1.4s linear infinite}
+  @keyframes shimmer{to{background-position:-200% 0}}
+  .bars{display:none;align-items:center;gap:3px;height:18px}
+  [data-s=listening] .bars{display:inline-flex}
+  .bars i{width:3px;height:4px;border-radius:2px;background:var(--red);animation:eq .9s ease-in-out infinite}
+  .bars i:nth-child(2){animation-delay:.15s}.bars i:nth-child(3){animation-delay:.3s}.bars i:nth-child(4){animation-delay:.45s}.bars i:nth-child(5){animation-delay:.6s}
+  @keyframes eq{0%,100%{height:4px}50%{height:16px}}
+
+  /* compact split pills (timer, music) */
+  .split{display:flex;align-items:center;justify-content:space-between;padding:0 10px 0 9px;height:100%}
+  .art{width:22px;height:22px;border-radius:6px;flex:none;background:var(--art,linear-gradient(135deg,#ff2d55,#5856d6))}
+  .eq{display:inline-flex;align-items:flex-end;gap:2px;height:14px;margin-right:6px}
+  .eq i{width:3px;border-radius:1.5px;background:var(--green);transform-origin:bottom;animation:eq2 1s ease-in-out infinite}
+  .eq i:nth-child(1){height:6px}.eq i:nth-child(2){height:12px;animation-delay:.2s}.eq i:nth-child(3){height:8px;animation-delay:.4s}.eq i:nth-child(4){height:11px;animation-delay:.1s}
+  .paused .eq i{animation-play-state:paused}
+  @keyframes eq2{50%{transform:scaleY(.35)}}
+  .ring{width:22px;height:22px;flex:none;rotate:-90deg}
+  .ring circle{fill:none;stroke-width:3}
+  .ring .bg{stroke:rgba(255,159,10,.25)}.ring .fg{stroke:var(--orange);stroke-linecap:round}
+  .ring .head{fill:#fff}
+  .bigring{width:84px;height:84px}
+  .bigring circle{stroke-width:2.4}
+  .timerrow{display:flex;align-items:center;gap:18px;margin-top:2px}
+  #bubble{position:fixed;z-index:2;width:38px;height:38px;border-radius:50%;background:#000;display:grid;place-items:center;opacity:0;scale:.4;pointer-events:none;box-shadow:0 8px 20px rgba(0,0,0,.18),inset 0 0 0 .5px rgba(255,255,255,.07);transition:opacity .2s,scale .45s linear(0, 0.45 15%, 1.08 35%, 0.97 55%, 1.01 75%, 1)}
+  #bubble.on{opacity:1;scale:1}
+  .hud{display:flex;align-items:center;gap:12px;height:100%;padding:0 16px}
+  .hud svg{width:18px;height:18px;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+  .hud .lvl{flex:1;height:6px;border-radius:3px;background:var(--tile2);overflow:hidden}
+  .hud .lvl i{display:block;height:100%;background:#fff;border-radius:3px;transition:width .15s var(--ease)}
+  .hours{display:flex;gap:6px;margin-top:12px;align-items:flex-end;height:70px}
+  .hours div{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:11px;color:var(--muted)}
+  .hours i{width:100%;border-radius:6px;background:linear-gradient(#ffd60a,#ff9f0a)}
+  .hours b{color:var(--fg);font-weight:500;font-size:12px}
+  .drop{display:flex;align-items:center;justify-content:center;gap:10px;height:100%;font-size:13.5px;font-weight:500;color:var(--fg)}
+  .drop svg{width:18px;height:18px;stroke:#0a84ff;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  .warn{display:flex;gap:10px;align-items:flex-start;background:rgba(255,69,58,.12);border-radius:14px;padding:10px 12px;margin-top:10px;font-size:13px;color:#ffb4ae}
+  .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+  .tval{color:var(--orange);font-weight:600;font-size:14px;font-variant-numeric:tabular-nums;margin-right:6px}
+
+  /* ---------- cards (one layout for every feature) ---------- */
+  .card{padding:18px 20px 18px}
+  @media (prefers-reduced-motion:no-preference){.card>*{animation:up .5s linear(0, 0.45 15%, 1.08 35%, 0.97 55%, 1.01 75%, 1) both,fade .25s ease-out both;animation-delay:calc(var(--i,0) * 40ms)}}
+  @keyframes fade{from{opacity:0}}
+  @keyframes up{from{translate:0 8px}}
+  .kicker{display:flex;align-items:center;gap:7px;white-space:nowrap;font-size:12px;font-weight:500;color:var(--muted);margin-bottom:6px}
+  .kicker svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+  .said{margin-left:auto;padding-left:12px;max-width:55%;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--faint)}
+  .title{font-size:17px;font-weight:600;letter-spacing:-.015em;color:var(--fg);line-height:1.3}
+  .body{font-size:13.5px;color:var(--fg2);margin-top:4px;line-height:1.5}
+  .big{font-size:44px;font-weight:600;letter-spacing:-.035em;line-height:1.05;font-variant-numeric:tabular-nums;color:var(--fg)}
+  .tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
+  .tile{background:var(--tile);border-radius:14px;padding:10px 12px}
+  .tile small{display:block;color:var(--muted);font-size:11.5px}
+  .tile b{font-size:17px;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .list{list-style:none;margin-top:10px}
+  .list li{display:flex;align-items:center;gap:12px;padding:8px 0;border-top:1px solid var(--line);font-size:13.5px;color:var(--fg2);transition:color .2s}
+  @media (prefers-reduced-motion:no-preference){.list li{animation:up .5s linear(0, 0.45 15%, 1.08 35%, 0.97 55%, 1.01 75%, 1) both,fade .25s ease-out both;animation-delay:calc(var(--j,0) * 45ms + 80ms)}}
+  .list li .k{color:var(--muted);min-width:52px;white-space:nowrap;font-variant-numeric:tabular-nums}
+  .list li .v{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .list li .ok{color:var(--green)}
+  #steps .k{min-width:16px}
+  .list li.play{cursor:pointer}
+  .list li.play:hover{color:var(--fg)}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:14px}
+  .chip{height:30px;padding:0 13px;border-radius:15px;background:var(--tile);color:var(--fg);font-size:12.5px;font-weight:500;transition:background .15s,transform .1s}
+  .chip:hover{background:#1e1e22}
+  .chip:active{transform:scale(.96)}
+  .chip:focus-visible,.ctrls button:focus-visible,.w-mic:focus-visible{outline:2px solid #0a84ff;outline-offset:2px}
+  .chip.danger{background:var(--red);color:#fff}
+  .chip.primary{background:var(--fg);color:#000}
+  .note{font-size:11.5px;color:var(--faint);margin-top:10px}
+  .thumb{float:right;width:64px;height:64px;border-radius:12px;object-fit:cover;margin:0 0 6px 12px}
+
+  /* Claude task live activity */
+  .task{display:flex;align-items:center;gap:12px;height:100%;padding:0 18px 0 14px}
+  .spin{width:18px;height:18px;flex:none}
+  .spin circle{fill:none;stroke-width:2.5;stroke-linecap:round}
+  .spin .bg{stroke:rgba(235,235,245,.16)}
+  .spin .fg{stroke:#d97757;stroke-dasharray:14 60;transform-origin:center}
+  @media (prefers-reduced-motion:no-preference){.spin .fg{animation:spin .9s linear infinite}}
+  @keyframes spin{to{rotate:360deg}}
+  .task .who{font-size:13px;font-weight:600;color:var(--fg);white-space:nowrap}
+  .task .what{flex:1;min-width:0;font-size:13px;color:var(--fg2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .task .step{font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+  .badge{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;flex:none;font-size:12px;font-weight:700;color:#000}
+  .badge.ok{background:var(--green)}
+  .badge.wait{background:var(--orange)}
+  .claude{width:18px;height:18px;flex:none;color:#d97757}
+  .steps2{list-style:none;margin-top:10px}
+  .steps2 li{display:flex;align-items:center;gap:12px;min-height:36px;font-size:13.5px;color:var(--faint)}
+  .steps2 li.done{color:var(--fg2)}
+  .steps2 li.cur{color:var(--fg)}
+  .steps2 .ic{width:18px;display:grid;place-items:center;flex:none;font-size:13px}
+  .steps2 li.done .ic{color:var(--green)}
+  /* notifications */
+  .notif{display:flex;align-items:center;gap:12px;height:100%;padding:0 18px 0 12px}
+  .app{width:36px;height:36px;border-radius:9px;flex:none;display:grid;place-items:center;color:#fff}
+  .app svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  .notif .txt{flex:1;min-width:0}
+  .notif .from{font-size:13.5px;font-weight:600;color:var(--fg);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .notif .msg{font-size:13px;color:var(--fg2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .notif .when{font-size:12px;color:var(--muted)}
+  .count{position:absolute;right:12px;top:50%;translate:0 -50%;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--red);color:#fff;font-size:11px;font-weight:700;display:grid;place-items:center;opacity:0;scale:.5;transition:opacity .2s,scale .35s linear(0, 0.45 15%, 1.08 35%, 0.97 55%, 1.01 75%, 1)}
+  .count.on{opacity:1;scale:1}
+  .nlist{list-style:none;margin-top:10px}
+  .nlist li{display:flex;gap:12px;align-items:center;padding:10px 0;border-top:.5px solid var(--line);cursor:pointer;border-radius:10px;transition:background .15s}
+  .nlist li:hover{background:rgba(255,255,255,.04)}
+  .nfull{display:flex;gap:12px;align-items:flex-start;margin-top:4px}
+  .nfull .app{width:40px;height:40px;border-radius:10px}
+  .nfull .from{font-size:16px;font-weight:600;color:var(--fg)}
+  .nfull .msg{font-size:14px;line-height:1.5;color:var(--fg2);margin-top:2px;white-space:normal}
+  .nlist .app{width:32px;height:32px;border-radius:8px}
+  .nlist .app svg{width:17px;height:17px}
+  .nlist .txt{flex:1;min-width:0}
+  /* music, following the sketch: compact mini player · now playing · playlist with fading track list */
+  .mini{display:flex;align-items:center;gap:14px;height:100%;padding:0 22px 0 14px}
+  .mini .art{width:32px;height:32px;border-radius:9px}                      /* sits inside the pill's curve with even space around it */
+  .mini .track{flex:1;height:4px;border-radius:2px;background:rgba(235,235,245,.18);overflow:hidden}
+  .mini .track i{display:block;height:100%;width:0;background:var(--fg2);border-radius:2px;transition:width .5s linear}
+  .mini .eq{height:20px;margin:0}
+  .mini .eq i{width:3px}
+  .mini .eq i:nth-child(1){height:9px}.mini .eq i:nth-child(2){height:18px}.mini .eq i:nth-child(3){height:12px}.mini .eq i:nth-child(4){height:16px}
+  .player{display:flex;gap:16px;align-items:center}
+  .player .cover{width:112px;height:112px;border-radius:20px;flex:none;background:var(--art);position:relative;overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,.35)}
+  .player .cover::after{content:"";position:absolute;inset:0;background:radial-gradient(circle at 30% 22%,rgba(255,255,255,.3),transparent 55%)}
+  .player .side{flex:1;min-width:0;display:flex;flex-direction:column}
+  .player .t{font-size:20px;font-weight:600;letter-spacing:-.02em;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .player .a{font-size:13px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .player .ctrls{justify-content:center;gap:8px;margin:8px 0 4px}
+  .player .ctrls button{width:44px;height:44px}
+  .player .ctrls #mPlay svg{width:26px;height:26px}
+  .player .prog{margin-top:2px}
+  .player .times{margin-top:4px}
+  .tracks{list-style:none;margin-top:16px;max-height:200px;overflow-y:auto;scrollbar-width:none;
+    -webkit-mask-image:linear-gradient(#000 62%,transparent);mask-image:linear-gradient(#000 62%,transparent)}
+  .tracks li{display:grid;grid-template-columns:20px 1fr 1fr;gap:12px;align-items:center;min-height:44px;border-top:.5px solid var(--line);font-size:14px;color:var(--fg2);cursor:pointer;transition:color .15s}
+  .tracks li:hover{color:var(--fg)}
+  .tracks li .n{color:var(--faint);font-size:12px;font-variant-numeric:tabular-nums}
+  .tracks li .ar{color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .tracks li.now{color:var(--fg)}
+  .tracks li.now .n{color:var(--green)}
+  /* now playing */
+  .np{display:flex;gap:14px;align-items:center;margin-top:4px}
+  .np .cover{width:64px;height:64px;border-radius:14px;flex:none;background:var(--art);position:relative;overflow:hidden}
+  .np .cover::after{content:"";position:absolute;inset:0;background:radial-gradient(circle at 30% 25%,rgba(255,255,255,.35),transparent 55%)}
+  .np .meta{flex:1;min-width:0}
+  .np .meta b{display:block;font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .np .meta span{color:var(--muted);font-size:13px}
+  .prog{height:4px;background:#222226;border-radius:2px;margin-top:14px;overflow:hidden}
+  .prog i{display:block;height:100%;width:0;background:var(--fg);border-radius:2px;transition:width .5s linear}
+  .times{display:flex;justify-content:space-between;color:var(--faint);font-size:11px;margin-top:5px;font-variant-numeric:tabular-nums}
+  .ctrls{display:flex;justify-content:center;gap:26px;margin-top:6px}
+  .ctrls button{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;color:var(--fg);transition:transform .12s,background .15s}
+  .ctrls button:hover{background:var(--tile)}
+  .ctrls button:active{transform:scale(.9)}
+  .ctrls svg{width:20px;height:20px;fill:currentColor}
+
+  /* widget */
+  .w-top{height:30px;display:flex;align-items:center;justify-content:center;cursor:grab}
+  .w-top i{width:36px;height:4px;border-radius:2px;background:#2a2a2e}
+  .w-mic{display:block;margin:14px auto 0;width:56px;height:56px;border-radius:50%;background:var(--tile);position:relative}
+  .w-mic::after{content:"";position:absolute;inset:21px;border-radius:50%;background:var(--faint);transition:.2s}
+  [data-s=listening] .w-mic::after{background:var(--red);box-shadow:0 0 14px var(--red);inset:18px}
+  .w-hint{text-align:center;color:var(--faint);font-size:12px;margin:10px 0 0}
+
+  /* page chrome (outside the island) */
+  .hint{margin:150px auto 0;color:#4b5563;font-size:12.5px;text-align:center;line-height:1.75;width:min(760px,94vw)}
+  .hint b{color:#111;font-weight:600}
+  #typed{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(440px,90vw);display:none;z-index:4}
+  #typed.on{display:flex}
+  #typed input{flex:1;height:42px;border-radius:14px;border:0;padding:0 14px;font:inherit;font-size:15px;box-shadow:0 8px 30px rgba(0,0,0,.18);outline:none}
+  @media (max-width:900px){.hint{font-size:11.5px}}
+
+  /* ---------- gallery: every look, side by side ---------- */
+  #gallery{width:min(1180px,94vw);margin:48px auto 80px}
+  #gallery h2{font-size:13px;font-weight:600;color:#5b6472;text-transform:uppercase;letter-spacing:.08em;margin:36px 0 14px}
+  #gallery h2:first-child{margin-top:0}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr));gap:18px}
+  .grid.pills{grid-template-columns:repeat(auto-fill,minmax(360px,1fr))}
+  .frame{background:rgba(255,255,255,.45);border:1px solid rgba(255,255,255,.6);border-radius:22px;padding:16px 16px 18px;display:flex;flex-direction:column;align-items:center;gap:14px;cursor:pointer;transition:transform .15s,background .15s}
+  .frame:hover{background:rgba(255,255,255,.65);transform:translateY(-2px)}
+  .frame .cap{align-self:stretch;display:flex;justify-content:space-between;font-size:12.5px;font-weight:600;color:#1f2937}
+  .frame .cap span{font-weight:400;color:#6b7280}
+  .isl{position:relative;background:var(--ink);color:var(--fg);overflow:hidden;box-shadow:0 12px 32px rgba(0,0,0,.16),0 2px 6px rgba(0,0,0,.08)}
+  .isl .layer{position:absolute;inset:0;opacity:1;pointer-events:none;filter:none!important;scale:1!important}
+  .isl.cardy .layer{position:relative;inset:auto}
+  .isl .w-top{display:flex}
+</style>
+</head>
+<body>
+
+
+<div id="island" data-s="idle" role="button" tabindex="0" aria-label="Assistant. Press Enter to talk, T to type.">
+  <div class="layer" id="lStatus"><div class="status"><span class="light"></span><span class="text" id="statusText"></span><span class="bars"><i></i><i></i><i></i><i></i><i></i></span></div></div>
+  <div class="layer" id="lTimer"><div class="split"><svg class="ring" viewBox="0 0 24 24"><circle class="bg" cx="12" cy="12" r="9"/><circle class="fg" id="tRing" cx="12" cy="12" r="9" stroke-dasharray="56.5" stroke-dashoffset="0"/><circle class="head" id="tHead" cx="21" cy="12" r="1.6"/></svg><span class="tval" id="tCompact">0:00</span></div></div>
+  <div class="layer" id="lHud"><div class="hud"><svg viewBox="0 0 24 24" id="hudIcon"></svg><span class="lvl"><i id="hudLvl"></i></span></div></div>
+  <div class="layer" id="lTask"><div class="task" id="taskRow"></div></div>
+  <div class="layer" id="lNotif"><div class="notif" id="notifRow"></div></div>
+  <span class="count" id="count"></span>
+  <div class="layer" id="lDrop"><div class="drop"><svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>Drop to add to Shelf</div></div>
+  <div class="layer" id="lMusic"><div class="mini"><span class="art" id="mArt"></span><span class="track"><i id="mMini"></i></span><span class="eq"><i></i><i></i><i></i><i></i></span></div></div>
+  <div class="layer" id="lCard"><div class="w-top" id="wTop" hidden><i></i></div><div class="card" id="card"></div></div>
+</div>
+
+<div id="bubble" aria-hidden="true"><svg class="ring" viewBox="0 0 24 24"><circle class="bg" cx="12" cy="12" r="9"/><circle class="fg" id="bRing" cx="12" cy="12" r="9" stroke-dasharray="56.5" stroke-dashoffset="0"/><circle class="head" id="bHead" cx="21" cy="12" r="1.6"/></svg></div>
+<div class="sr" aria-live="polite" id="live"></div>
+<form id="typed"><input id="typedIn" placeholder="Type what you'd say…" autocomplete="off"></form>
+
+<div class="hint" id="hint">
+  <b>Click</b> the island and talk · try “play Blinding Lights”, “songs like Fejezz”, “play my workout playlist”, “who is Ada Lovelace”, “weather in Budapest”, “100 euro to forint”, “15% of 80”, “note buy milk”, “5 minute timer”, “translate good morning to Hungarian”, “delete my old downloads”, “open Spotify”, “research the best laptop for students”<br>
+  <b>N</b> for a demo notification · 
+  <b>Drag files</b> onto the page for the Shelf · <b>↑ ↓</b> for the volume HUD · 
+<b>Pull it down</b> to snap it into a widget · drag it back to the top to dock · <b>T</b> to type · <b>Esc</b> to close
+</div>
+
+<main id="gallery"></main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const island = $("island");
+const esc = (t) => String(t ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+const ICON = {
+  music: '<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>',
+  web: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>',
+  weather: '<path d="M7 18a4 4 0 0 1 0-8 6 6 0 0 1 11.5 1.5A3.5 3.5 0 0 1 18 18z"/>',
+  timer: '<circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2M9 2h6"/>',
+  calc: '<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8 7h8M8 12h.01M12 12h.01M16 12h.01M8 16h.01M12 16h.01M16 16h.01"/>',
+  note: '<path d="M5 4h11l3 3v13H5z"/><path d="M9 10h6M9 14h6"/>',
+  pc: '<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/>',
+  cal: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
+  info: '<circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v5h1"/>',
+};
+
+// ---------------- state ----------------
+let s = "idle", hover = false, cardOpen = false, mode = "dock", pulling = null, widgetPos = null;
+let timer = null, music = null, hud = null, dragOver = false, shelf = [];
+let task = null, flashTask = 0, notifs = [], unread = 0, notifShow = 0, taskPinned = false;
+function setS(v, text) { s = v; island.dataset.s = v; if (text !== undefined) $("statusText").textContent = text; }
+
+// ---------------- geometry: one black shape that springs between sizes ----------------
+const box = { x: innerWidth / 2 - 63, y: 10, w: 126, h: 36, vx: 0, vy: 0, vw: 0, vh: 0 };
+let target = null;
+const TEAR = 160;
+function contentH() { return $("lCard").scrollHeight; }
+function shape() {                               // which size + layer the island shows right now
+  const cx = innerWidth / 2, at = (w, h, layer, r) => ({ x: cx - w / 2, y: 10, w, h, layer, r: r ?? h / 2 });
+  if (mode === "widget") return { x: widgetPos.x, y: widgetPos.y, w: 360, h: Math.max(160, contentH()), layer: "lCard", r: 28 };
+  if (dragOver) return at(260, 48, "lDrop");
+  if (s === "listening") return at(300, 48, "lStatus");
+  if (s === "thinking") return at(240, 42, "lStatus");
+  if (hud && performance.now() < hud.until) return at(220, 40, "lHud");
+  if (performance.now() < notifShow) { if (hover) notifShow = Math.max(notifShow, performance.now() + 800); return at(360, 60, "lNotif"); }   // a notification drops in
+  if (task && performance.now() < flashTask) return at(240, 44, "lTask");          // "Ready" / "Needs your OK" moment
+  if (cardOpen) return at(400, contentH(), "lCard", 28);
+  if (task && task.status !== "done") return hover || taskPinned ? at(400, contentTaskH(), "lCard", 28) : at(330, 44, "lTask");   // Claude working
+  if (timer && music) return at(hover ? 312 : 300, 56, "lMusic");   // two activities: music here, timer in the bubble
+  if (timer) return at(hover ? 196 : 180, 38, "lTimer");
+  if (music) return at(hover ? 312 : 300, 56, "lMusic");
+  if (hover) return at(170, 40, "lStatus");
+  return at(126, 36, null);
+}
+let last = performance.now();
+function drawRings(now) {   // smooth every frame; draws in when the timer starts; a white head shows it moving
+  if (!timer) return;
+  const left = Math.max(0, (timer.end - Date.now()) / (timer.secs * 1000));
+  const intro = Math.min(1, (now - timer.t0) / 700), ease = 1 - Math.pow(1 - intro, 3);
+  const frac = left * ease, a = 2 * Math.PI * frac;
+  for (const [ring, head] of [["tRing", "tHead"], ["bRing", "bHead"], ["tBigRing", "tBigHead"]]) {
+    const r = $(ring), h = $(head); if (!r) continue;
+    r.style.strokeDashoffset = 56.5 * (1 - frac);
+    if (h) { h.setAttribute("cx", (12 + 9 * Math.cos(a)).toFixed(2)); h.setAttribute("cy", (12 + 9 * Math.sin(a)).toFixed(2)); }
+  }
+}
+function frame(now) {
+  const dt = Math.min(.033, (now - last) / 1000); last = now;
+  drawRings(now);
+  const sh = shape();
+  if (!pulling || !pulling.moved) target = sh;
+  const k = pulling ? 520 : 290, c = pulling ? 34 : 23;
+  for (const [p, v] of [["x", "vx"], ["y", "vy"], ["w", "vw"], ["h", "vh"]]) { box[v] += (k * (target[p] - box[p]) - c * box[v]) * dt; box[p] += box[v] * dt; }
+  Object.assign(island.style, { left: box.x + "px", top: box.y + "px", width: box.w + "px", height: box.h + "px", borderRadius: Math.min(sh.r, box.h / 2) + "px" });
+  for (const id of ["lStatus", "lTimer", "lMusic", "lCard", "lHud", "lDrop", "lTask", "lNotif"]) $(id).classList.toggle("on", id === sh.layer);
+  $("count").textContent = unread; $("count").classList.toggle("on", unread > 0 && !sh.layer);
+  if (task && task.status !== "done" && (hover || taskPinned) && sh.layer === "lCard" && !cardOpen && $("card").dataset.task !== "1") renderTaskCard();
+  const dual = mode === "dock" && timer && music && !cardOpen && s === "idle" && sh.layer === "lMusic";
+  $("bubble").classList.toggle("on", !!dual);
+  if (dual) Object.assign($("bubble").style, { left: box.x + box.w + 8 + "px", top: box.y + (box.h - 38) / 2 + "px" });
+  if (sh.layer === "lStatus" && s === "idle") $("statusText").textContent = "Click to talk";
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+// ---------------- pointer: hover, click, pull into a widget, drag ----------------
+addEventListener("pointermove", (e) => {
+  if (pulling) return onPull(e);
+  if (mode !== "dock") return;
+  hover = e.clientY < box.y + box.h + 24 && Math.abs(e.clientX - innerWidth / 2) < Math.max(110, box.w / 2 + 20);
+});
+island.addEventListener("pointerdown", (e) => {
+  if (e.button !== 0 || e.target.closest("button:not(.w-mic),.play,a")) return;
+  if (mode === "widget" && !e.target.closest(".w-top,.w-mic")) return;
+  pulling = { x0: e.clientX, y0: e.clientY, bx: box.x, by: box.y, moved: false, mic: !!e.target.closest(".w-mic") };
+  island.setPointerCapture(e.pointerId);
+});
+function onPull(e) {
+  const dx = e.clientX - pulling.x0, dy = e.clientY - pulling.y0;
+  if (!pulling.moved && Math.hypot(dx, dy) < 6) return;
+  pulling.moved = true;
+  if (mode === "widget") { widgetPos = { x: pulling.bx + dx, y: pulling.by + dy }; target = shape(); return; }
+  const base = shape(), pull = Math.max(0, dy), t = Math.min(1, pull / TEAR);
+  const w = Math.max(120, base.w * (1 - .15 * t)), h = base.h + pull * .5;
+  target = { ...base, x: innerWidth / 2 - w / 2 + dx * .2, y: 10 + pull * .25, w, h };
+  if (pull > TEAR) {                                // snap: it becomes a widget under the pointer
+    mode = "widget"; cardOpen = false; island.classList.add("widget"); $("wTop").hidden = false;
+    widgetPos = { x: e.clientX - 180, y: Math.max(64, e.clientY - 15) };
+    pulling.bx = widgetPos.x; pulling.by = widgetPos.y; pulling.x0 = e.clientX; pulling.y0 = e.clientY;
+    if (!$("card").innerHTML) render({ icon: "info", kicker: "Ready", title: "Ask anything", body: "Press the button below and talk." });
+    else addWidgetBits();
+  }
+}
+addEventListener("pointerup", () => {
+  if (!pulling) return;
+  const p = pulling; pulling = null;
+  if (!p.moved) {
+    if (mode === "dock" && performance.now() < notifShow && notifs[0]) { notifShow = 0; unread = Math.max(0, unread - 1); show(notifDetail(notifs[0])); return; }
+    if (mode === "dock" && task && task.status !== "done") { taskPinned = !taskPinned; if (!taskPinned) $("card").dataset.task = ""; return; }
+    if (mode === "dock" && unread && !cardOpen && s === "idle" && !task) { show(notifCenter()); unread = 0; return; }
+    if (mode === "dock" || p.mic) talk();
+    return;
+  }
+  if (mode === "widget" && widgetPos.y < 36) {     // dropped on the top edge: dock again
+    mode = "dock"; island.classList.remove("widget"); $("wTop").hidden = true;
+    $("card").querySelectorAll(".w-mic,.w-hint").forEach((el) => el.remove());
+    cardOpen = !!$("card").innerHTML; hover = true;
+  }
+});
+
+// click anywhere outside the island → it collapses back to the small pill
+addEventListener("pointerdown", (e) => {
+  if (mode !== "dock" || island.contains(e.target) || e.target.closest("#typed")) return;
+  if (cardOpen || taskPinned) { cardOpen = false; taskPinned = false; $("card").dataset.task = ""; hover = false; }
+});
+
+// ---------------- listening (Web Speech) ----------------
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let rec = null;
+function talk() {
+  if (s === "listening") { rec?.stop(); return; }
+  if (!SR) return openTyped();
+  rec = new SR(); rec.lang = navigator.language || "en-US"; rec.interimResults = true;
+  let final = "";
+  rec.onresult = (e) => { let t = ""; for (const r of e.results) { t += r[0].transcript; if (r.isFinal) final = t; } $("statusText").textContent = t; };
+  rec.onerror = (e) => { if (e.error === "not-allowed") openTyped(); };
+  rec.onend = () => (final.trim() ? handle(final.trim()) : setS("idle"));
+  cardOpen = false; setS("listening", "Listening…"); rec.start();
+}
+function openTyped() { setS("idle"); $("typed").classList.add("on"); $("typedIn").focus(); }
+$("typed").onsubmit = (e) => { e.preventDefault(); const t = $("typedIn").value.trim(); $("typedIn").value = ""; $("typed").classList.remove("on"); if (t) handle(t); };
+addEventListener("keydown", (e) => {
+  if (e.key.toLowerCase() === "t" && document.activeElement !== $("typedIn")) { e.preventDefault(); openTyped(); }
+  if (e.key === "Escape") { $("typed").classList.remove("on"); rec?.abort(); setS("idle"); cardOpen = false; }
+  if ((e.key === "Enter" || e.key === " ") && document.activeElement === island) { e.preventDefault(); talk(); }
+  if (e.key.toLowerCase() === "n" && document.activeElement !== $("typedIn")) { e.preventDefault(); notify(); }
+  if ((e.key === "ArrowUp" || e.key === "ArrowDown") && document.activeElement !== $("typedIn")) { e.preventDefault(); showHud(e.key === "ArrowUp" ? 1 : -1); }
+});
+
+// ---------------- one card layout for every answer ----------------
+let lastAnswer = null, closeT = null;
+function cardHTML(a) {
+  const parts = [
+    a.bare ? "" : `<div class="kicker"><svg viewBox="0 0 24 24">${ICON[a.icon] || ICON.info}</svg>${esc(a.kicker)}${a.said ? `<span class="said">“${esc(a.said)}”</span>` : ""}</div>`,
+    a.title ? `<div class="title">${esc(a.title)}</div>` : "",
+    a.html || "",
+    a.body ? `<div class="body">${esc(a.body)}</div>` : "",
+    a.chips?.length ? `<div class="chips">${a.chips.map((c, i) => `<button class="chip ${i === 0 ? "primary" : ""}" data-chip="${i}">${esc(c.label)}</button>`).join("")}</div>` : "",
+    a.note ? `<div class="note">${esc(a.note)}</div>` : "",
+  ].filter(Boolean);
+  return parts.map((p, i) => p.replace(/^<(\w+)/, `<$1 style="--i:${i}"`)).join("");
+}
+function render(a) {
+  lastAnswer = a;
+  $("card").innerHTML = cardHTML(a);
+  $("card").querySelectorAll(".list li").forEach((li, j) => li.style.setProperty("--j", j));
+  $("card").querySelectorAll("[data-chip]").forEach((b) => (b.onclick = () => a.chips[+b.dataset.chip].run()));
+  a.after?.();
+  if (mode === "widget") addWidgetBits();
+}
+function addWidgetBits() {
+  if ($("card").querySelector(".w-mic")) return;
+  $("card").insertAdjacentHTML("beforeend", `<button class="w-mic" title="Talk"></button><p class="w-hint">Drag the handle · drop on the top edge to dock</p>`);
+}
+function show(a) {
+  render(a); setS("idle");
+  $("live").textContent = [a.title, a.body].filter(Boolean).join(". ") || a.kicker;
+  if (mode === "dock") { cardOpen = true; clearTimeout(closeT); closeT = setTimeout(autoClose, a.stay ? 30000 : 12000); }
+}
+function autoClose() { if (hover) return (closeT = setTimeout(autoClose, 3000)); cardOpen = false; }
+
+// ---------------- intents ----------------
+async function handle(text) {
+  setS("thinking", "Thinking");
+  const t = text.toLowerCase().trim();
+  let a;
+  try {
+    if (/^(play|put on)\b|\bspotify\b.*\b(songs?|play)|\bsongs? like\b|\bmusic like\b|\bplaylist\b/.test(t)) a = musicIntent(text, t);
+    else if (/weather|temperature|\brain\b|forecast/.test(t)) a = await weather(text, t);
+    else if (/timer|remind me in/.test(t)) a = startTimer(text, t);
+    else if (/\b(usd|eur|euro|euros|huf|forint|gbp|pound|pounds|dollar|dollars|chf|jpy|yen)\b.*\b(to|in)\b/.test(t)) a = await currency(text, t);
+    else if (/^[\d\s.+\-*/x×()%]+$|% of|percent of|\bplus\b|\bminus\b|\btimes\b|divided by/.test(t)) a = calc(text, t);
+    else if (/^(note|remember|write down)\b/.test(t)) a = note(text);
+    else if (/\b(today|schedule|calendar|agenda)\b/.test(t)) a = schedule(text);
+    else if (/^(research|compare|find me|plan|summari[sz]e|write|draft|organi[sz]e)\b/.test(t)) { startTask(text); setS("idle"); return; }
+    else if (/^translate\b/.test(t)) a = await translate(text, t);
+    else if (/\b(delete|remove|empty|clean up|wipe|uninstall)\b/.test(t)) a = confirmRisky(text, t);
+    else if (/\bshelf\b/.test(t)) a = shelfCard(text);
+    else if (/\b(open|launch|start)\b/.test(t)) a = openApp(text, t);
+    else if (/\b(files?|downloads?|folder|disk)\b/.test(t)) a = files(text);
+    else if (/\b(time is it|what time)\b/.test(t)) a = { icon: "timer", kicker: "Time", said: text, html: `<div class="big">${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</div>` };
+    else a = await webInfo(text, t);
+  } catch (e) { a = { icon: "info", kicker: "Hmm", said: text, title: "Something went wrong", body: String(e.message || e) }; }
+  await new Promise((r) => setTimeout(r, 250)); // let the thinking shimmer read
+  show(a);
+}
+
+// --- music: now-playing card, playlist card and the mini player in the island
+const ART = ["linear-gradient(135deg,#ff2d55,#5856d6)", "linear-gradient(135deg,#ff9f0a,#ff375f)", "linear-gradient(135deg,#30d158,#0a84ff)", "linear-gradient(135deg,#bf5af2,#5e5ce6)", "linear-gradient(135deg,#64d2ff,#5856d6)"];
+const spotify = (q) => window.open("https://open.spotify.com/search/" + encodeURIComponent(q), "_blank", "noopener");
+function musicIntent(said, t) {
+  const like = t.match(/(?:songs?|music|tracks?) like (.+)/)?.[1];
+  if (like) {
+    const artist = cap(like.replace(/[.?!]$/, "").replace(/\bon spotify\b/, "").trim());
+    const recs = [[`${artist} radio`, "Similar artists, mixed"], ["Late night drive", `For fans of ${artist}`], ["Fresh finds", "New and close to your taste"], [`This is ${artist}`, "The essentials"]];
+    return { icon: "music", kicker: "Music", said, title: `More like ${artist}`, stay: true,
+      html: `<ul class="list">${recs.map(([a, b], i) => `<li class="play" data-q="${esc(a)}"><span class="art" style="--art:${ART[i % 5]}"></span><span class="v"><b style="color:var(--fg);font-weight:500">${esc(a)}</b> · ${esc(b)}</span><span>▶</span></li>`).join("")}</ul>`,
+      note: "Preview picks. The app uses your real Spotify history.",
+      after: () => document.querySelectorAll("#card .play").forEach((li) => (li.onclick = () => play(li.dataset.q, li.dataset.q))) };
+  }
+  if (/playlist/.test(t)) {
+    const name = cap((t.match(/(?:play )?(?:my )?(.+?) playlist/)?.[1] || "daily mix").replace(/^the /, ""));
+    const tracks = [["Blinding Lights", "The Weeknd"], ["Levitating", "Dua Lipa"], ["Titanium", "David Guetta"], ["Stronger", "Kanye West"], ["Lose Yourself", "Eminem"], ["Can't Hold Us", "Macklemore"], ["Till I Collapse", "Eminem"]];
+    music = { title: tracks[0][0], artist: tracks[0][1], playlist: name, art: ART[2], dur: 200, pos: 0, playing: true, queue: tracks, q: name + " playlist" };
+    tick();
+    return nowPlaying(said);
+  }
+  const q = t.replace(/^(play|put on)\s+/, "").replace(/\bon spotify\b/, "").replace(/[.?!]$/, "").trim() || "something good";
+  return play(q, q, said, true);
+}
+function play(q, title, said, ret) {
+  music = { title: cap(title), artist: "Spotify", art: ART[Math.floor(Math.random() * 5)], dur: 214, pos: 0, playing: true, q };
+  tick();
+  const a = nowPlaying(said || "");
+  if (ret) return a; show(a);
+}
+const CTRL = { prev: '<path d="M6 5h2v14H6zM20 5v14L9 12z"/>', next: '<path d="M16 5h2v14h-2zM4 5v14l11-7z"/>' };
+function nowPlaying(said) {
+  const m = music, pl = !!m.queue;
+  const idx = pl ? m.queue.findIndex(([t]) => t === m.title) : -1;
+  return { bare: true, said, stay: true,
+    html: `<div class="player"><div class="cover" style="--art:${m.art}"></div><div class="side">
+        <div class="t">${esc(pl ? m.playlist : m.title)}</div>
+        <div class="a">${esc(pl ? `${m.title} · ${m.artist}` : m.artist)}</div>
+        <div class="ctrls"><button id="mPrev" aria-label="Previous"><svg viewBox="0 0 24 24">${CTRL.prev}</svg></button><button id="mPlay" aria-label="Play or pause"><svg viewBox="0 0 24 24" id="mPlayIcon">${m.playing === false ? '<path d="M7 4v16l13-8z"/>' : '<path d="M7 5h4v14H7zM13 5h4v14h-4z"/>'}</svg></button><button id="mNext" aria-label="Next"><svg viewBox="0 0 24 24">${CTRL.next}</svg></button></div>
+        <div class="prog"><i id="mProg"></i></div><div class="times"><span id="mPos">0:00</span><span>${fmt(m.dur)}</span></div>
+      </div></div>
+      ${pl ? `<ul class="tracks">${m.queue.map(([t, a], i) => `<li data-i="${i}" class="${i === idx ? "now" : ""}"><span class="n">${i === idx ? "♪" : i + 1}</span><span>${esc(t)}</span><span class="ar">${esc(a)}</span></li>`).join("")}</ul>` : ""}`,
+    after: () => {
+      $("mPlay").onclick = () => { music.playing = !music.playing; tick(); };
+      $("mNext").onclick = () => skip(1); $("mPrev").onclick = () => skip(-1);
+      document.querySelectorAll("#card .tracks li").forEach((li) => (li.onclick = () => jump(+li.dataset.i)));
+      tick();
+    } };
+}
+function jump(i) { const [t, a] = music.queue[i]; music.title = t; music.artist = a; music.pos = 0; music.art = ART[i % 5]; render(nowPlaying(lastAnswer?.said || "")); }
+function skip(d) {
+  if (!music) return;
+  if (music.queue) { const i = Math.max(0, Math.min(music.queue.length - 1, music.queue.findIndex(([t]) => t === music.title) + d)); return jump(i); }
+  music.pos = 0; music.art = ART[(ART.indexOf(music.art) + 1) % 5];
+  render(nowPlaying(lastAnswer?.said || ""));
+}
+let musicInt = null;
+function tick() {
+  clearInterval(musicInt);
+  const upd = () => {
+    if (!music) return;
+    if (music.playing) music.pos = Math.min(music.dur, music.pos + .5);
+    if (music.pos >= music.dur) skip(1);
+    const p = $("mProg"); if (p) p.style.width = (100 * music.pos / music.dur) + "%";
+    $("mMini").style.width = (100 * music.pos / music.dur) + "%";
+    const t = $("mPos"); if (t) t.textContent = fmt(music.pos);
+    const ic = $("mPlayIcon"); if (ic) ic.innerHTML = music.playing ? '<path d="M7 5h4v14H7zM13 5h4v14h-4z"/>' : '<path d="M7 4v16l13-8z"/>';
+    $("mArt").style.setProperty("--art", music.art);
+    $("lMusic").classList.toggle("paused", !music.playing);
+  };
+  upd(); musicInt = setInterval(upd, 500);
+}
+
+// --- web info: real summary from Wikipedia
+async function webInfo(said, t) {
+  const q = t.replace(/^(search( for)?|look up|google|tell me about|who (is|was|are)|what (is|are|was)|what's|define)\s+/, "").replace(/[?.!]$/, "").trim();
+  const web = { label: "Search the web", run: () => window.open("https://www.google.com/search?q=" + encodeURIComponent(q), "_blank", "noopener") };
+  const s1 = await fetch(`https://en.wikipedia.org/w/api.php?action=opensearch&limit=1&namespace=0&format=json&origin=*&search=${encodeURIComponent(q)}`).then((r) => r.json());
+  const title = s1?.[1]?.[0];
+  if (!title) return { icon: "web", kicker: "Web", said, title: `Nothing quick for “${q}”`, body: "In the app, Claude researches this properly across the web.", chips: [web] };
+  const sm = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`).then((r) => r.json());
+  const text = (sm.extract || "").split(/(?<=\.)\s/).slice(0, 3).join(" ");
+  return { icon: "web", kicker: "From the web", said, title: sm.title, stay: true,
+    html: `<div class="body">${sm.thumbnail ? `<img class="thumb" src="${esc(sm.thumbnail.source)}" alt="">` : ""}${esc(text)}</div>`,
+    chips: [{ label: "Read more", run: () => window.open(sm.content_urls?.desktop?.page, "_blank", "noopener") }, web], note: "Source: Wikipedia" };
+}
+
+// --- weather: real
+async function weather(said, t) {
+  const city = t.match(/\bin ([a-zà-ž .'-]+)/i)?.[1]?.replace(/\b(today|tomorrow|now)\b/g, "").trim() || "Budapest";
+  const g = await fetch(`https://geocoding-api.open-meteo.com/v1/search?count=1&name=${encodeURIComponent(city)}`).then((r) => r.json());
+  const p = g.results?.[0]; if (!p) return { icon: "weather", kicker: "Weather", said, title: `I couldn't find ${city}` };
+  const w = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${p.latitude}&longitude=${p.longitude}&current=temperature_2m,apparent_temperature&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max&hourly=temperature_2m&timezone=auto&forecast_days=2`).then((r) => r.json());
+  const r = Math.round;
+  const nowIdx = w.hourly.time.findIndex((x) => new Date(x) >= new Date(Date.now() - 3600e3));
+  const hrs = w.hourly.time.slice(nowIdx, nowIdx + 6).map((x, i) => [new Date(x).getHours(), w.hourly.temperature_2m[nowIdx + i]]);
+  return { icon: "weather", kicker: `Weather · ${p.name}`, said, html: `<div class="big">${r(w.current.temperature_2m)}°</div><div class="tiles"><div class="tile"><small>Feels like</small><b>${r(w.current.apparent_temperature)}°</b></div><div class="tile"><small>High / low</small><b>${r(w.daily.temperature_2m_max[0])}° / ${r(w.daily.temperature_2m_min[0])}°</b></div><div class="tile"><small>Rain</small><b>${w.daily.precipitation_probability_max[0]}%</b></div></div>${hoursHTML(hrs)}` };
+}
+
+// --- timer: split pill while running
+function startTimer(said, t) {
+  const n = parseFloat(t.match(/(\d+(\.\d+)?)/)?.[1] || "5"), secs = Math.round(/second/.test(t) ? n : /hour/.test(t) ? n * 3600 : n * 60);
+  if (timer) clearInterval(timer.int);
+  timer = { end: Date.now() + secs * 1000, secs, t0: performance.now() };
+  timer.int = setInterval(() => {
+    if (!timer) return;
+    const left = Math.max(0, Math.ceil((timer.end - Date.now()) / 1000));
+    $("tCompact").textContent = fmt(left);
+    const big = $("tBig"); if (big) big.textContent = fmt(left);
+    if (!left) { clearInterval(timer.int); timer = null; show({ icon: "timer", kicker: "Timer", title: "Time's up" }); }
+  }, 250);
+  $("tCompact").textContent = fmt(secs);
+  return { icon: "timer", kicker: "Timer", said, html: timerHTML(fmt(secs), 0),
+    chips: [{ label: "Cancel", run: () => { clearInterval(timer?.int); timer = null; cardOpen = false; } }] };
+}
+
+// --- currency: real rates
+async function currency(said, t) {
+  const map = { euro: "EUR", euros: "EUR", eur: "EUR", forint: "HUF", huf: "HUF", dollar: "USD", dollars: "USD", usd: "USD", pound: "GBP", pounds: "GBP", gbp: "GBP", chf: "CHF", yen: "JPY", jpy: "JPY" };
+  const m = t.match(/([\d.,]+)\s*([a-z]+)\s+(?:to|in)\s+([a-z]+)/);
+  if (!m || !map[m[2]] || !map[m[3]]) throw new Error("Say it like “100 euro to forint”.");
+  const amt = parseFloat(m[1].replace(",", ".")), from = map[m[2]], to = map[m[3]];
+  const d = await fetch(`https://api.frankfurter.app/latest?amount=${amt}&from=${from}&to=${to}`).then((r) => r.json());
+  const v = d.rates[to];
+  return { icon: "calc", kicker: "Currency", said, html: `<div class="big">${v.toLocaleString(undefined, { maximumFractionDigits: 2 })} ${to}</div>`, body: `${amt} ${from} · rate ${(v / amt).toFixed(4)} · ${d.date}` };
+}
+
+// --- math
+function calc(said, t) {
+  const e = t.replace(/what('s| is)/, "").replace(/(\d+(\.\d+)?)\s*(%|percent) of\s*(\d+(\.\d+)?)/g, "($1/100*$4)")
+    .replace(/\bplus\b/g, "+").replace(/\bminus\b/g, "-").replace(/\btimes\b|×|\bx\b/g, "*").replace(/divided by/g, "/").replace(/[?=]/g, "").trim();
+  if (!/^[\d\s.+\-*/()]+$/.test(e)) throw new Error("I can do + − × ÷ and percentages.");
+  const v = Function(`"use strict";return (${e})`)();
+  return { icon: "calc", kicker: "Calculator", said, html: `<div class="big">${(+v.toFixed(6)).toLocaleString()}</div>` };
+}
+
+// --- notes (kept in this browser)
+function notes() { try { return JSON.parse(localStorage.getItem("island-notes") || "[]"); } catch { return []; } }
+function note(said) {
+  const text = said.replace(/^(note|remember|write down)( that)?[:,]?\s*/i, "");
+  const all = [{ text, at: Date.now() }, ...notes()].slice(0, 6);
+  try { localStorage.setItem("island-notes", JSON.stringify(all)); } catch {}
+  return { icon: "note", kicker: "Notes", said, title: "Saved", html: `<ul class="list">${all.map((n) => `<li><span class="k">${new Date(n.at).toLocaleDateString([], { month: "short", day: "numeric" })}</span><span class="v">${esc(n.text)}</span></li>`).join("")}</ul>` };
+}
+
+// --- previews of PC actions (the app does these for real)
+function openApp(said, t) {
+  const name = cap((t.match(/(?:open|launch|start)\s+(.+)/)?.[1] || "app").replace(/[.?!]$/, "").replace(/^the /, ""));
+  const steps = [`Find ${name}`, `Open ${name}`, "Bring to front"];
+  return { icon: "pc", kicker: "On your PC", said, title: `Opening ${name}`, html: `<ul class="list" id="steps">${steps.map((x) => `<li><span class="k">○</span><span class="v">${esc(x)}</span></li>`).join("")}</ul>`,
+    note: "Preview. The app does this on your PC.",
+    after: () => document.querySelectorAll("#steps li").forEach((li, i) => setTimeout(() => { const k = li.querySelector(".k"); k.textContent = "✓"; k.classList.add("ok"); li.style.color = "var(--fg)"; }, 400 * (i + 1))) };
+}
+function files(said) {
+  const f = [["4.2 GB", "ubuntu-24.04.iso"], ["1.1 GB", "project-render.mp4"], ["620 MB", "photos-backup.zip"], ["310 MB", "setup-installer.exe"]];
+  return { icon: "pc", kicker: "Downloads", said, title: "Biggest files", html: `<ul class="list">${f.map(([a, b]) => `<li><span class="k">${a}</span><span class="v">${b}</span></li>`).join("")}</ul>`,
+    chips: [{ label: "Open folder", run: () => {} }, { label: "Clean up", run: () => {} }], note: "Preview data. The app reads your real files." };
+}
+function schedule(said) {
+  const ev = [["10:00", "Stand-up"], ["13:00", "Lunch with Anna"], ["15:00", "Design review"]];
+  return { icon: "cal", kicker: "Today", said, title: "3 events", html: `<ul class="list">${ev.map(([a, b]) => `<li><span class="k">${a}</span><span class="v">${b}</span></li>`).join("")}</ul>`, note: "Preview data. The app connects to your calendar." };
+}
+
+// ---------------- new building blocks ----------------
+function timerHTML(text, frac) {
+  return `<div class="timerrow"><svg class="ring bigring" viewBox="0 0 24 24"><circle class="bg" cx="12" cy="12" r="9"/><circle class="fg" id="tBigRing" cx="12" cy="12" r="9" stroke-dasharray="56.5" stroke-dashoffset="${(56.5 * frac).toFixed(1)}"/><circle class="head" id="tBigHead" cx="${(12 + 9 * Math.cos(2 * Math.PI * (1 - frac))).toFixed(2)}" cy="${(12 + 9 * Math.sin(2 * Math.PI * (1 - frac))).toFixed(2)}" r="1.4"/></svg><div class="big" id="tBig">${text}</div></div>`;
+}
+function hoursHTML(hrs) {
+  const lo = Math.min(...hrs.map((h) => h[1])), hi = Math.max(...hrs.map((h) => h[1]));
+  return `<div class="hours">${hrs.map(([h, t], i) => `<div><b>${Math.round(t)}°</b><i style="height:${8 + 34 * ((t - lo) / (hi - lo || 1))}px"></i>${i ? String(h).padStart(2, "0") : "Now"}</div>`).join("")}</div>`;
+}
+const VOL = { up: '<path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/>', low: '<path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/>', mute: '<path d="M11 5 6 9H2v6h4l5 4V5zM22 9l-6 6M16 9l6 6"/>' };
+let volume = 0.6;
+function showHud(d) {   // system volume HUD lives in the island instead of a separate overlay
+  volume = Math.min(1, Math.max(0, volume + d * 0.0625));
+  $("hudLvl").style.width = volume * 100 + "%";
+  $("hudIcon").innerHTML = volume === 0 ? VOL.mute : volume < 0.5 ? VOL.low : VOL.up;
+  hud = { until: performance.now() + 1400 };
+}
+async function translate(said, t) {
+  const m = said.match(/^translate\s+(.+?)\s+(?:to|into)\s+([a-zA-Z]+)\s*[.?!]?$/i);
+  if (!m) throw new Error("Say it like “translate good morning to Hungarian”.");
+  const LANG = { hungarian: "hu", german: "de", french: "fr", spanish: "es", italian: "it", english: "en", japanese: "ja", portuguese: "pt", dutch: "nl", polish: "pl" };
+  const to = LANG[m[2].toLowerCase()] || m[2].slice(0, 2).toLowerCase();
+  const d = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(m[1])}&langpair=en|${to}`).then((r) => r.json());
+  return { icon: "web", kicker: `Translate → ${cap(m[2])}`, said, title: d.responseData.translatedText, body: m[1], chips: [{ label: "Copy", run: () => navigator.clipboard?.writeText(d.responseData.translatedText) }] };
+}
+function confirmRisky(said, t) {   // anything destructive asks first, with the exact consequence spelled out
+  const what = (t.match(/(?:delete|remove|empty|clean up|wipe|uninstall)\s+(.+)/)?.[1] || "these files").replace(/[.?!]$/, "").replace(/^my /, "your ");
+  const a = { icon: "pc", kicker: "Needs your OK", said, title: `Delete ${what}?`,
+    html: `<div class="warn"><span>⚠</span><span>23 items · 6.2 GB will move to the Recycle Bin. You can restore them from there.</span></div>`,
+    chips: [{ label: "Cancel", run: () => { cardOpen = false; } }, { label: "Delete", run: () => show({ icon: "pc", kicker: "On your PC", title: "Moved to Recycle Bin", body: "23 items · 6.2 GB freed", note: "Preview. The app does this for real, only after you confirm." }) }], stay: true,
+    after: () => { const b = $("card").querySelectorAll(".chip"); b[0].classList.remove("primary"); b[1]?.classList.add("danger"); } };
+  return a;
+}
+function shelfCard(said) {
+  return { icon: "pc", kicker: "Shelf", said, title: shelf.length ? `${shelf.length} item${shelf.length > 1 ? "s" : ""} on the shelf` : "Shelf is empty",
+    html: shelf.length ? `<ul class="list">${shelf.map((f) => `<li><span class="k">${f.size}</span><span class="v">${esc(f.name)}</span></li>`).join("")}</ul>` : "",
+    body: shelf.length ? "" : "Drag files onto the island to keep them here for later.",
+    chips: shelf.length ? [{ label: "Clear", run: () => { shelf = []; show(shelfCard("")); } }] : [], stay: true };
+}
+const size = (b) => b > 1e9 ? (b / 1e9).toFixed(1) + " GB" : b > 1e6 ? (b / 1e6).toFixed(1) + " MB" : Math.max(1, Math.round(b / 1e3)) + " KB";
+// file shelf: drag files from your desktop onto the page; the island becomes a drop target
+addEventListener("dragover", (e) => { if ([...(e.dataTransfer?.types || [])].includes("Files")) { e.preventDefault(); dragOver = true; cardOpen = false; } });
+addEventListener("dragleave", (e) => { if (!e.relatedTarget) dragOver = false; });
+addEventListener("drop", (e) => {
+  e.preventDefault(); dragOver = false;
+  for (const f of e.dataTransfer.files) shelf.unshift({ name: f.name, size: size(f.size) });
+  shelf = shelf.slice(0, 8);
+  show(shelfCard(""));
+});
+
+// ---------------- Claude task: live progress in the island ----------------
+const CLAUDE = '<svg class="claude" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.7 6.3L20 6.6l-4.6 4.6L22 12l-6.6 1.7 4.6 4.7-6.3-1.7L12 22l-1.7-6.3L4 17.4l4.6-4.7L2 12l6.6-.8L4 6.6l6.3 1.7z"/></svg>';
+const SPIN = '<svg class="spin" viewBox="0 0 24 24"><circle class="bg" cx="12" cy="12" r="9"/><circle class="fg" cx="12" cy="12" r="9"/></svg>';
+function startTask(said) {
+  const clean = said.replace(/[.?!]$/, "").trim(), what = (clean[0].toUpperCase() + clean.slice(1)).slice(0, 60);
+  task = { said, what, steps: ["Understanding the request", "Searching the web", "Comparing 6 sources", "Writing the summary"], i: 0, start: Date.now(), status: "working" };
+  cardOpen = false; renderTaskRow();
+  const next = () => {
+    if (!task || task.status !== "working") return;
+    task.i++;
+    if (task.i === 2 && /buy|order|delete|send|book/i.test(said)) { task.status = "approval"; taskPinned = true; renderTaskRow(); renderTaskCard(); notifyTask("Needs your OK", task.what); return; }
+    if (task.i >= task.steps.length) return finishTask();
+    renderTaskRow(); if ($("card").dataset.task === "1") renderTaskCard();
+    setTimeout(next, 1700);
+  };
+  setTimeout(next, 1700);
+  clearInterval(task.int); task.int = setInterval(() => { if (task?.status !== "done") renderTaskRow(); }, 1000);
+}
+function renderTaskRow() {
+  if (!task) return;
+  const secs = Math.floor((Date.now() - task.start) / 1000);
+  const lead = task.status === "done" ? '<span class="badge ok">✓</span>' : task.status === "approval" ? '<span class="badge wait">!</span>' : SPIN;
+  const label = task.status === "done" ? "Ready" : task.status === "approval" ? "Needs your OK" : task.steps[task.i];
+  $("taskRow").innerHTML = `${lead}<span class="who">Claude</span><span class="what">${esc(label)}</span><span class="step">${task.status === "working" ? `${task.i + 1}/${task.steps.length} · ${fmt(secs)}` : ""}</span>`;
+}
+function taskAnswer() {
+  const t = task;
+  return { icon: "info", kicker: t.status === "done" ? "Claude · done" : t.status === "approval" ? "Claude needs your OK to book" : "Claude is working", said: t.said, title: t.what,
+    html: `<ul class="steps2">${t.steps.map((x, i) => { const st = t.status === "done" || i < t.i ? "done" : i === t.i ? "cur" : ""; return `<li class="${st}"><span class="ic">${st === "done" ? "✓" : st === "cur" ? SPIN : "○"}</span>${esc(x)}</li>`; }).join("")}</ul><div class="prog"><i style="width:${t.status === "done" ? 100 : (100 * t.i / t.steps.length)}%;background:#d97757;transition:width .4s"></i></div>`,
+    chips: t.status === "approval" ? [{ label: "Allow", run: () => { task.status = "working"; taskPinned = false; renderTaskRow(); renderTaskCard(); setTimeout(() => { task.i++; finishTask(); }, 1500); } }, { label: "Stop", run: cancelTask }] : [{ label: "Cancel", run: cancelTask }] };
+}
+function renderTaskCard() { render(taskAnswer()); $("card").dataset.task = "1"; }
+function contentTaskH() { return $("card").dataset.task === "1" ? contentH() : 200; }
+function cancelTask() { clearInterval(task?.int); task = null; taskPinned = false; $("card").dataset.task = ""; cardOpen = false; }
+function finishTask() {
+  task.status = "done"; task.i = task.steps.length; clearInterval(task.int); taskPinned = false;
+  renderTaskRow(); flashTask = performance.now() + 2200; $("card").dataset.task = "";
+  notifyTask("Ready", task.what);
+  setTimeout(() => {
+    const t = task; if (!t) return;
+    show({ icon: "info", kicker: "Claude · done in " + fmt(Math.floor((Date.now() - t.start) / 1000)), said: t.said, title: t.what,
+      html: `<div class="body">Here's the short version: the top three options, what sets them apart, and the one I'd pick for you.</div><ul class="list"><li><span class="k">1</span><span class="v">Best overall</span></li><li><span class="k">2</span><span class="v">Best value</span></li><li><span class="k">3</span><span class="v">If you want the lightest</span></li></ul>`,
+      chips: [{ label: "Copy summary", run: () => {} }], note: "Preview. In the app this is Claude's real answer.", stay: true });
+    task = null;
+  }, 2300);
+}
+function notifyTask(title, what) { notifs.unshift({ app: "claude", from: `Claude · ${title}`, msg: what, at: Date.now() }); }
+
+// ---------------- notifications: drop in, then leave a badge ----------------
+const APPS = {
+  messages: { bg: "#30d158", icon: '<path d="M21 12a8 8 0 0 1-11.6 7.1L4 21l1.9-5.4A8 8 0 1 1 21 12z"/>' },
+  mail: { bg: "#0a84ff", icon: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/>' },
+  calendar: { bg: "#ff3b30", icon: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>' },
+  claude: { bg: "#d97757", icon: '<path d="M12 4l1.5 5.5L19 8l-4 4 4 4-5.5-1.5L12 20l-1.5-5.5L5 16l4-4-4-4 5.5 1.5z"/>' },
+};
+const DEMO = [
+  { app: "messages", from: "Anna", msg: "Dinner Friday at 8? I booked the place we liked", full: "Dinner Friday at 8? I booked the place we liked last time, the little Italian one near the river. They only had the table by the window left, so I grabbed it. Let me know if 8 is too early and I'll move it to 8:30." },
+  { app: "mail", from: "GitHub", msg: "Build passed · Jarvis for Windows #7", full: "Build passed · Jarvis for Windows #7. All 3 jobs finished in 3m 12s on branch ccr-49856555-cycj2h. The installer Jarvis-Setup-2.0.1.exe was uploaded to the release." },
+  { app: "calendar", from: "Design review", msg: "Starts in 10 minutes · Room 3", full: "Design review starts in 10 minutes in Room 3. Attendees: you, Anna, Mark and Zoe. Agenda: island animations, notification cards, and the music player." },
+];
+let demoI = 0;
+function notify(n = DEMO[demoI++ % DEMO.length]) {
+  n = { ...n, at: Date.now() };
+  notifs.unshift(n); notifs = notifs.slice(0, 12); unread++;
+  const a = APPS[n.app];
+  $("notifRow").innerHTML = `<span class="app" style="background:${a.bg}"><svg viewBox="0 0 24 24">${a.icon}</svg></span><span class="txt"><div class="from">${esc(n.from)}</div><div class="msg">${esc(n.msg)}</div></span><span class="when">now</span>`;
+  notifShow = performance.now() + 4200;
+  $("live").textContent = `${n.from}: ${n.msg}`;
+}
+function notifDetail(n) {
+  const a = APPS[n.app], ago = Math.floor((Date.now() - n.at) / 60000);
+  const name = { messages: "Messages", mail: "Mail", calendar: "Calendar", claude: "Claude" }[n.app] || "Notification";
+  return { icon: "info", kicker: `${name} · ${ago < 1 ? "now" : ago + "m ago"}`, stay: true,
+    html: `<div class="nfull"><span class="app" style="background:${a.bg}"><svg viewBox="0 0 24 24">${a.icon}</svg></span><div style="flex:1;min-width:0"><div class="from">${esc(n.from)}</div><div class="msg">${esc(n.full || n.msg)}</div></div></div>`,
+    chips: [
+      ...(n.app === "messages" || n.app === "mail" ? [{ label: "Reply", run: () => { $("typedIn").value = `reply to ${n.from}: `; $("typed").classList.add("on"); $("typedIn").focus(); } }] : []),
+      { label: "Mark as read", run: () => { cardOpen = false; } },
+      { label: "Dismiss", run: () => { notifs = notifs.filter((x) => x !== n); cardOpen = false; } },
+    ] };
+}
+function notifCenter() {
+  const ago = (t) => { const m = Math.floor((Date.now() - t) / 60000); return m < 1 ? "now" : m + "m"; };
+  return { icon: "info", kicker: "Notifications", title: notifs.length ? `${notifs.length} notification${notifs.length > 1 ? "s" : ""}` : "You're all caught up",
+    html: notifs.length ? `<ul class="nlist">${notifs.map((n, i) => `<li data-n="${i}"><span class="app" style="background:${APPS[n.app].bg}"><svg viewBox="0 0 24 24">${APPS[n.app].icon}</svg></span><span class="txt"><div class="from" style="font-size:13.5px;font-weight:600;color:var(--fg)">${esc(n.from)}</div><div style="font-size:13px;color:var(--fg2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(n.msg)}</div></span><span style="font-size:12px;color:var(--muted)">${ago(n.at)}</span></li>`).join("")}</ul>` : "",
+    chips: notifs.length ? [{ label: "Clear all", run: () => { notifs = []; cardOpen = false; } }] : [], stay: true,
+    after: () => document.querySelectorAll("#card .nlist li").forEach((li) => (li.onclick = () => show(notifDetail(notifs[+li.dataset.n])))) };
+}
+
+// ---------------- gallery ----------------
+const STATUS = (st, text, extra = "") => `<div class="layer"><div class="status"><span class="light"></span><span class="text">${esc(text)}</span>${extra}<span class="bars"><i></i><i></i><i></i><i></i><i></i></span></div></div>`;
+const PILLS = [
+  ["Idle", "always there", 126, 36, "idle", ""],
+  ["Hover", "move the mouse near it", 170, 40, "idle", STATUS("idle", "Click to talk")],
+  ["Listening", "red · your words appear live", 300, 48, "listening", STATUS("listening", "play blinding lights")],
+  ["Thinking", "shimmer", 240, 42, "thinking", STATUS("thinking", "Thinking")],
+  ["Timer running", "ring fills as time passes", 180, 38, "idle", `<div class="layer"><div class="split"><svg class="ring" viewBox="0 0 24 24"><circle class="bg" cx="12" cy="12" r="9"/><circle class="fg" cx="12" cy="12" r="9" stroke-dasharray="56.5" stroke-dashoffset="20"/></svg><span class="tval">3:12</span></div></div>`],
+  ["Volume", "replaces the system HUD · ↑ ↓ keys", 220, 40, "idle", `<div class="layer"><div class="hud"><svg viewBox="0 0 24 24">${'<path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/>'}</svg><span class="lvl"><i style="width:62%"></i></span></div></div>`],
+  ["Drop target", "drag files onto the island", 260, 48, "idle", `<div class="layer"><div class="drop"><svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>Drop to add to Shelf</div></div>`],
+  ["Next meeting", "live activity", 230, 38, "idle", `<div class="layer"><div class="split"><span style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--fg2)"><span style="width:8px;height:8px;border-radius:50%;background:#0a84ff"></span>Design review</span><span class="tval" style="color:#0a84ff">in 12m</span></div></div>`],
+  ["Claude working", "spinner · current step · progress", 330, 44, "idle", `<div class="layer"><div class="task">${SPIN}<span class="who">Claude</span><span class="what">Comparing 6 sources</span><span class="step">3/4 · 0:05</span></div></div>`],
+  ["Claude needs you", "amber · a decision is waiting", 240, 44, "idle", `<div class="layer"><div class="task"><span class="badge wait">!</span><span class="who">Claude</span><span class="what">Needs your OK</span><span class="step"></span></div></div>`],
+  ["Claude is ready", "green · then the answer opens", 240, 44, "idle", `<div class="layer"><div class="task"><span class="badge ok">✓</span><span class="who">Claude</span><span class="what">Ready</span><span class="step"></span></div></div>`],
+  ["Notification", "drops in, then tucks away · N key", 360, 60, "idle", `<div class="layer"><div class="notif"><span class="app" style="background:#30d158"><svg viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 21l1.9-5.4A8 8 0 1 1 21 12z"/></svg></span><span class="txt"><div class="from">Anna</div><div class="msg">Dinner Friday at 8? I booked the place we liked</div></span><span class="when">now</span></div></div>`],
+  ["Unread badge", "click the island to see them", 126, 36, "idle", `<span class="count on" style="right:10px">3</span>`],
+  ["Charging", "live activity", 180, 38, "idle", `<div class="layer"><div class="split"><span style="font-size:12.5px;color:var(--fg2);margin-left:6px">Charging</span><span class="tval" style="color:var(--green)">84%</span></div></div>`],
+  ["Music playing", "mini player", 300, 56, "idle", `<div class="layer"><div class="mini"><span class="art" style="--art:${ART[0]}"></span><span class="track"><i style="width:35%"></i></span><span class="eq"><i></i><i></i><i></i><i></i></span></div></div>`],
+];
+const sampleMusic = { title: "Blinding Lights", artist: "The Weeknd", art: ART[0], dur: 200, pos: 0, q: "Blinding Lights" };
+const samplePlaylist = { title: "Levitating", artist: "Dua Lipa", playlist: "Workout", art: ART[2], dur: 203, pos: 0, q: "workout playlist",
+  queue: [["Blinding Lights", "The Weeknd"], ["Levitating", "Dua Lipa"], ["Titanium", "David Guetta"], ["Stronger", "Kanye West"], ["Lose Yourself", "Eminem"], ["Can't Hold Us", "Macklemore"]] };
+const CARDS = [
+  ["Music", "Now playing", "play blinding lights", () => { const m = music; music = sampleMusic; const a = nowPlaying("play blinding lights"); music = m; return a; }],
+  ["Music", "Songs like…", "songs like fejezz", () => musicIntent("songs like fejezz", "songs like fejezz")],
+  ["Music", "Playlist", "play my workout playlist", () => { const m = music; music = samplePlaylist; const a = nowPlaying("play my workout playlist"); music = m; return a; }],
+  ["Web", "Answer from the web", "who is ada lovelace", () => ({ icon: "web", kicker: "From the web", said: "who is ada lovelace", title: "Ada Lovelace", body: "Augusta Ada King, Countess of Lovelace, was an English mathematician and writer chiefly known for her work on Charles Babbage's proposed mechanical general-purpose computer, the Analytical Engine.", chips: [{ label: "Read more" }, { label: "Search the web" }], note: "Source: Wikipedia" })],
+  ["Weather", "Weather + next hours", "weather in budapest", () => ({ icon: "weather", kicker: "Weather · Budapest", said: "weather in budapest", html: `<div class="big">9°</div><div class="tiles"><div class="tile"><small>Feels like</small><b>6°</b></div><div class="tile"><small>High / low</small><b>12° / 4°</b></div><div class="tile"><small>Rain</small><b>10%</b></div></div>${hoursHTML([[21, 9], [22, 8], [23, 7], [0, 6], [1, 6], [2, 5]])}` })],
+  ["Timer", "Timer set", "5 minute timer", () => ({ icon: "timer", kicker: "Timer", said: "5 minute timer", html: timerHTML("3:12", 0.36), chips: [{ label: "Cancel" }] })],
+  ["Translate", "Translation", "translate good morning to hungarian", () => ({ icon: "web", kicker: "Translate → Hungarian", said: "translate good morning to hungarian", title: "Jó reggelt", body: "good morning", chips: [{ label: "Copy" }] })],
+  ["Safety", "Asks before anything risky", "delete my old downloads", () => { const a = confirmRisky("delete my old downloads", "delete my old downloads"); a.chips = [{ label: "Cancel" }, { label: "Delete" }]; return a; }],
+  ["Shelf", "File shelf", "drag files onto the page", () => { const keep = shelf; shelf = [{ name: "contract-final.pdf", size: "1.2 MB" }, { name: "IMG_2041.jpg", size: "3.4 MB" }]; const a = shelfCard(""); shelf = keep; return a; }],
+  ["Claude", "Task in progress (hover the island)", "research the best laptop for students", () => ({ icon: "info", kicker: "Claude is working", said: "research the best laptop for students", title: "Research the best laptop for students", html: `<ul class="steps2"><li class="done"><span class="ic">✓</span>Understanding the request</li><li class="done"><span class="ic">✓</span>Searching the web</li><li class="cur"><span class="ic">${SPIN}</span>Comparing 6 sources</li><li><span class="ic">○</span>Writing the summary</li></ul><div class="prog"><i style="width:50%;background:#d97757"></i></div>`, chips: [{ label: "Cancel" }] })],
+  ["Notifications", "Notification, read in full (click it)", "", () => notifDetail({ ...DEMO[0], at: Date.now() })],
+  ["Notifications", "Notification list", "", () => { const keep = notifs; notifs = DEMO.map((d, i) => ({ ...d, at: Date.now() - i * 4 * 60000 })); const a = notifCenter(); notifs = keep; return a; }],
+  ["Errors", "When something fails", "", () => ({ icon: "info", kicker: "Couldn't finish", title: "No internet connection", body: "I'll try again when you're back online.", chips: [{ label: "Retry" }] })],
+  ["Timer", "Time's up", "", () => ({ icon: "timer", kicker: "Timer", title: "Time's up" })],
+  ["Money", "Currency", "100 euro to forint", () => ({ icon: "calc", kicker: "Currency", said: "100 euro to forint", html: `<div class="big">39,412 HUF</div>`, body: "100 EUR · rate 394.12 · today" })],
+  ["Math", "Calculator", "15% of 80", () => calc("15% of 80", "15% of 80")],
+  ["Notes", "Note saved", "note buy milk", () => ({ icon: "note", kicker: "Notes", said: "note buy milk", title: "Saved", html: `<ul class="list"><li><span class="k">Today</span><span class="v">buy milk</span></li><li><span class="k">Nov 17</span><span class="v">call the dentist</span></li></ul>` })],
+  ["Calendar", "Today", "what's on today", () => schedule("what's on today")],
+  ["PC", "Opening an app", "open spotify", () => { const a = openApp("open spotify", "open spotify"); a.html = a.html.replace(/○/g, "✓").replace(/class="k"/g, 'class="k ok"'); a.after = null; return a; }],
+  ["PC", "Files", "biggest files in downloads", () => files("biggest files in downloads")],
+  ["Time", "Clock", "what time is it", () => ({ icon: "timer", kicker: "Time", said: "what time is it", html: `<div class="big">${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</div>` })],
+];
+function buildGallery() {
+  const g = $("gallery");
+  let html = `<h2>Island states</h2><div class="grid pills">`;
+  const dual = `<div class="frame" data-pill="dual"><div class="cap">Two at once<span>music + timer bubble</span></div><div style="display:flex;gap:8px"><div class="isl" style="width:270px;height:56px;border-radius:28px"><div class="layer"><div class="mini"><span class="art" style="--art:${ART[0]}"></span><span class="track"><i style="width:35%"></i></span><span class="eq"><i></i><i></i><i></i><i></i></span></div></div></div><div class="isl" style="width:38px;height:38px;border-radius:19px;display:grid;place-items:center;align-self:center"><svg class="ring" viewBox="0 0 24 24"><circle class="bg" cx="12" cy="12" r="9"/><circle class="fg" cx="12" cy="12" r="9" stroke-dasharray="56.5" stroke-dashoffset="20"/></svg></div></div></div>`;
+  PILLS.forEach(([name, sub, w, h, st, inner], i) => {
+    html += `<div class="frame" data-pill="${i}"><div class="cap">${name}<span>${sub}</span></div><div class="isl" data-s="${st}" style="width:${w}px;height:${h}px;border-radius:${h / 2}px">${inner}</div></div>`;
+  });
+  html += dual + `</div><h2>Answers</h2><div class="grid">`;
+  CARDS.forEach(([group, name, said, make], i) => {
+    const a = make();
+    html += `<div class="frame" data-card="${i}"><div class="cap">${name}<span>${said ? "“" + esc(said) + "” · click to try" : group}</span></div><div class="isl cardy" style="width:400px;max-width:100%;border-radius:28px"><div class="layer"><div class="card">${cardHTML(a)}</div></div></div></div>`;
+  });
+  const w = { icon: "info", kicker: "Ready", title: "Ask anything", body: "Press the button below and talk." };
+  html += `</div><h2>Widget</h2><div class="grid"><div class="frame" data-widget><div class="cap">Pulled-off widget<span>drag by the handle · drop on the top edge to dock</span></div><div class="isl cardy" style="width:360px;border-radius:28px"><div class="layer"><div class="w-top"><i></i></div><div class="card">${cardHTML(w)}<button class="w-mic"></button><p class="w-hint">Drag the handle · drop on the top edge to dock</p></div></div></div></div></div>`;
+  g.innerHTML = html;
+  g.querySelectorAll('[data-card] .chip').forEach((b) => { if (b.textContent === "Delete") { b.classList.remove("primary"); b.classList.add("danger"); } if (b.textContent === "Cancel" && b.nextElementSibling?.textContent === "Delete") b.classList.remove("primary"); });
+  g.querySelectorAll("[data-card]").forEach((f) => (f.onclick = () => { const said = CARDS[+f.dataset.card][2]; if (said) { scrollTo({ top: 0, behavior: "smooth" }); handle(said); } }));
+  g.querySelectorAll("[data-pill]").forEach((f) => (f.onclick = () => {
+    scrollTo({ top: 0, behavior: "smooth" });
+    const i = f.dataset.pill === "dual" ? -1 : +f.dataset.pill;
+    const name = i >= 0 ? PILLS[i][0] : "";
+    if (name === "Listening") { cardOpen = false; setS("listening", "play blinding lights"); setTimeout(() => setS("idle"), 2500); }
+    if (name === "Thinking") { cardOpen = false; setS("thinking", "Thinking"); setTimeout(() => setS("idle"), 2500); }
+    if (name === "Timer running") { startTimer("", "5 minute timer"); cardOpen = false; }
+    if (name === "Music playing") { music = { ...sampleMusic, playing: true }; tick(); cardOpen = false; }
+    if (name === "Volume") { showHud(0); island.focus(); }
+    if (name.startsWith("Claude")) { startTask(name === "Claude needs you" ? "research and book a table for friday" : "research the best laptop for students"); }
+    if (name === "Notification" || name === "Unread badge") { notify(); }
+    if (f.dataset.pill === "dual") { music = { ...sampleMusic, playing: true }; tick(); startTimer("", "3 minute timer"); cardOpen = false; }
+  }));
+}
+
+const fmt = (sec) => `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, "0")}`;
+const cap = (x) => String(x).replace(/\b\w/g, (c) => c.toUpperCase());
+buildGallery();
+</script>
+</body>
+</html>

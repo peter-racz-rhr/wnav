@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:">
+<title>Welcome to Jarvis</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="onboard.css">
+</head>
+<body>
+<main class="win" id="win">
+  <div class="drag" aria-hidden="true"></div>
+  <button class="x" id="close" aria-label="Close setup">✕</button>
+
+  <!-- the empty slot where Jarvis will live; it fills as you go -->
+  <div class="slot" id="slot" aria-hidden="true"><span class="fill"></span><span class="dots" id="dots"></span></div>
+  <div class="isle" id="isle" role="button" tabindex="0" aria-label="Jarvis. Drag me to the top of your screen."><span class="eye"></span><span class="hi">Hi</span></div>
+
+  <!-- one line, one action per page -->
+  <section class="step" data-name="hello">
+    <h1 class="words">Meet Jarvis.</h1>
+    <button class="primary" data-next>Get started</button>
+  </section>
+
+  <section class="step" data-name="claude">
+    <h1 class="words" id="acctTitle">Connect your Claude account.</h1>
+    <button class="primary" id="acctBtn" disabled>Sign in</button>
+    <button class="sub" data-next>Later</button>
+  </section>
+
+  <section class="step" data-name="mic">
+    <div class="voice" id="voice"><i></i><i></i></div>
+    <h1 class="words" id="micTitle">Say hi.</h1>
+    <button class="primary" id="micBtn">Allow microphone</button>
+    <button class="sub" data-next>Skip</button>
+  </section>
+
+  <section class="step" data-name="screen">
+    <h1 class="words">Can I see your screen when you ask?</h1>
+    <button class="primary" data-yes="allowControl">Allow</button>
+    <button class="sub" data-no="allowControl">Not now</button>
+  </section>
+
+  <section class="step" data-name="activity">
+    <h1 class="words">Show Claude Code and your notifications here?</h1>
+    <button class="primary" data-yes="activity">Yes</button>
+    <button class="sub" data-no="activity">No thanks</button>
+  </section>
+
+  <section class="step" data-name="name">
+    <h1 class="words">What should I call you?</h1>
+    <input class="big" id="fName" placeholder="Your name" autocomplete="off">
+    <button class="primary" data-next>Continue</button>
+  </section>
+
+  <section class="step" data-name="city">
+    <h1 class="words">Where are you?</h1>
+    <input class="big" id="fCity" placeholder="City, for the weather" autocomplete="off">
+    <button class="primary" data-next>Continue</button>
+  </section>
+
+  <section class="step" data-name="cal">
+    <h1 class="words">Paste your calendar link.</h1>
+    <input class="big" id="fCal" placeholder="Secret iCal address" autocomplete="off">
+    <p class="res" id="calRes"></p>
+    <button class="primary" id="calBtn">Connect</button>
+    <button class="sub" data-next>Skip</button>
+    <button class="how" data-help="cal">Where do I find it?</button>
+  </section>
+
+  <section class="step" data-name="mail">
+    <h1 class="words">Connect your email.</h1>
+    <div class="pair"><input class="big" id="fMail" placeholder="you@gmail.com" autocomplete="off"><input class="big" id="fPass" type="password" placeholder="App password" autocomplete="new-password"></div>
+    <p class="res" id="mailRes"></p>
+    <button class="primary" id="mailBtn">Connect</button>
+    <button class="sub" data-next>Skip</button>
+    <button class="how" data-help="mail">What's an app password?</button>
+  </section>
+
+  <section class="step" data-name="spotify">
+    <h1 class="words">Connect Spotify.</h1>
+    <input class="big" id="fSp" placeholder="Spotify Client ID" autocomplete="off">
+    <p class="res" id="spRes"></p>
+    <button class="primary" id="spBtn">Connect</button>
+    <button class="sub" data-next>Skip</button>
+    <button class="how" data-help="spotify">How do I get one?</button>
+  </section>
+
+  <section class="step finale" data-name="finale">
+    <h1 class="words" id="finTitle">Drag me to the top.</h1>
+    <svg class="arrow" viewBox="0 0 60 90" aria-hidden="true"><path d="M30 84 V8"/><path d="M14 24 L30 8 L46 24"/></svg>
+    <button class="sub" id="placeBtn">Put it there for me</button>
+    <p class="hear" id="hear"></p>
+  </section>
+
+  <div class="sheet" id="sheet" hidden><p id="sheetText"></p><button class="primary" id="sheetOk">Got it</button></div>
+</main>
+<script src="onboard.js" defer></script>
+</body>
+</html>

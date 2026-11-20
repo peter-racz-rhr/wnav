@@ -1,0 +1,58 @@
+{
+  "name": "jarvis-desktop",
+  "productName": "Jarvis",
+  "version": "3.3.5",
+  "description": "Jarvis: a liquid voice assistant for Windows, powered by your Claude account. Talk to it, show it your screen, let it do things.",
+  "main": "src/main.js",
+  "type": "module",
+  "author": "Jarvis",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win --x64 --publish never"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "1.10.0",
+    "@huggingface/transformers": "3.8.1",
+    "imapflow": "2.10.0",
+    "kokoro-js": "1.2.1"
+  },
+  "devDependencies": {
+    "electron": "45.2.2",
+    "electron-builder": "26.18.0"
+  },
+  "build": {
+    "appId": "com.jarvis.desktop",
+    "productName": "Jarvis",
+    "directories": {
+      "output": "dist",
+      "buildResources": "assets"
+    },
+    "files": [
+      "src/**",
+      "assets/**",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "node_modules/onnxruntime-node/**",
+      "node_modules/sharp/**",
+      "node_modules/@img/**"
+    ],
+    "win": {
+      "icon": "assets/icon.png",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": true,
+      "artifactName": "Jarvis-Setup-${version}.exe",
+      "shortcutName": "Jarvis"
+    }
+  }
+}

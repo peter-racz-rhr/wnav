@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'">
+<title>Jarvis</title>
+<link rel="stylesheet" href="panel.css">
+</head>
+<body>
+<div class="card" id="card">
+
+  <!-- approval -->
+  <section id="v-approval" hidden>
+    <p class="q" id="apQ"></p>
+    <pre id="apCmd"></pre>
+    <p class="hint">Say “yes” or “no”, or</p>
+    <div class="btns"><button class="ghost" id="apNo">Don't</button><button class="primary" id="apYes">Allow</button></div>
+  </section>
+
+  <!-- setup -->
+  <section id="v-setup" hidden>
+    <div class="step" data-step="0">
+      <div class="dot"></div>
+      <h2>Hi, I'm Jarvis.</h2>
+      <p>I'm the black island at the top of your screen. Click me and ask anything; answers drop down as cards. Let's get me connected. It takes a minute.</p>
+      <div class="btns"><button class="primary" data-next>Start</button></div>
+    </div>
+    <div class="step" data-step="1">
+      <span class="n">1 / 4</span>
+      <h2>Your Claude account</h2>
+      <p id="acctText">Checking…</p>
+      <div class="btns"><span class="ok" id="acctOk"></span><button class="primary" id="acctBtn" disabled>Sign in</button></div>
+    </div>
+    <div class="step" data-step="2">
+      <span class="n">2 / 4</span>
+      <h2>Microphone</h2>
+      <p>Press Allow, then say something. The bar should move.</p>
+      <div class="meter"><i id="micMeter"></i></div>
+      <p class="hint" id="micHint"></p>
+      <div class="btns"><button class="ghost" data-next>Skip</button><button class="primary" id="micBtn">Allow</button></div>
+    </div>
+    <div class="step" data-step="3">
+      <span class="n">3 / 4</span>
+      <h2>Your screen</h2>
+      <p>When you ask, I can look at your screen, point at things with my own cursor, and use your mouse and keyboard. I always ask first, and <kbd>Esc</kbd> stops me.</p>
+      <label class="tg"><input type="checkbox" id="ctl" checked> Allow mouse and keyboard control when I ask</label>
+      <label class="tg"><input type="checkbox" id="ccAct" checked> Show my Claude Code sessions (Claude app, terminal, VS Code) in the island</label>
+      <p class="hint">This adds a small hook to Claude Code's settings so it tells Jarvis each step. Turn it off any time in Settings.</p>
+      <div class="btns"><button class="primary" data-next>Continue</button></div>
+    </div>
+    <div class="step" data-step="4">
+      <span class="n">4 / 4</span>
+      <h2>Hearing</h2>
+      <p>Speech recognition runs on your PC, so your audio never leaves it. This downloads once (about 290 MB).</p>
+      <div class="meter big"><i id="dlMeter"></i></div>
+      <p class="hint" id="dlHint">Starting…</p>
+      <div class="btns"><button class="primary" id="finish">Finish</button></div>
+    </div>
+  </section>
+
+  <!-- settings -->
+  <section id="v-settings" hidden>
+    <div class="vh"><h2>Settings</h2><button class="link" data-close>Done</button></div>
+    <form class="form" id="form">
+      <div class="acct" id="acct"><p id="acctState">Checking…</p><button type="button" class="ghost" id="acctSwitch">Sign in</button></div>
+      <div class="row">
+        <label>Brain<select name="model">
+          <option value="claude-sonnet-5-5">Fast (Sonnet)</option>
+          <option value="claude-opus-5-5">Smartest (Opus)</option>
+          <option value="claude-haiku-5-5">Fastest (Haiku)</option>
+        </select></label>
+        <label>Voice<select name="voiceName">
+          <option value="bm_george">George, British</option>
+          <option value="bm_fable">Fable, British</option>
+          <option value="bm_daniel">Daniel, British</option>
+          <option value="bf_emma">Emma, British</option>
+          <option value="am_michael">Michael, American</option>
+          <option value="af_heart">Heart, American</option>
+        </select></label>
+      </div>
+      <div class="row">
+        <label>I speak<input name="language" placeholder="auto"></label>
+        <label>Call me<input name="name"></label>
+      </div>
+      <div class="row">
+        <label>Talk hotkey<input name="hotkeyTalk"></label>
+        <label>Hearing<select name="speechModel">
+          <option value="onnx-community/whisper-tiny">Quick</option>
+          <option value="onnx-community/whisper-base">Balanced</option>
+          <option value="onnx-community/whisper-small">Most accurate</option>
+        </select></label>
+      </div>
+      <label class="tg"><input type="checkbox" name="voice"> Speak out loud</label>
+      <label class="tg"><input type="checkbox" name="allowControl"> Let me use your mouse and keyboard when asked</label>
+      <label class="tg"><input type="checkbox" name="confirmCommands"> Ask before running commands</label>
+      <label class="tg"><input type="checkbox" name="claudeActivity"> Show my Claude Code sessions in the island</label>
+      <label class="tg"><input type="checkbox" name="approveFromIsland"> Allow / Deny Claude Code's permission requests from the island</label>
+      <label class="tg"><input type="checkbox" name="otherNotifications"> Show other apps' notifications (WhatsApp, Discord, Outlook…)</label>
+      <label class="tg"><input type="checkbox" name="clipboardHistory"> Keep a clipboard history (last 20, only on this PC)</label>
+      <label class="tg"><input type="checkbox" name="smartSuggestions"> Suggestions (copied an error → Explain, finished download → Open)</label>
+      <label class="tg"><input type="checkbox" name="downloads"> Show download progress</label>
+      <label class="tg"><input type="checkbox" name="morningBriefing"> Morning briefing the first time I come by each day</label>
+      <label class="tg"><input type="checkbox" name="browserMedia"> Show music playing in the browser too (YouTube Music, SoundCloud…). Off: videos don't pop up</label>
+      <label class="tg"><input type="checkbox" name="autoHideFullscreen"> Tuck into a small bump over full-screen and maximized apps</label>
+      <label class="tg"><input type="checkbox" name="autoUpdate"> Update Jarvis automatically</label>
+      <label class="tg"><input type="checkbox" name="openAtLogin"> Start with Windows</label>
+
+      <div class="grp">Your day</div>
+      <label>Weather city<input name="city" placeholder="Budapest"></label>
+      <label>Calendar link (private iCal address)<input name="icalUrl" placeholder="https://calendar.google.com/calendar/ical/…/basic.ics"></label>
+      <p class="hint">Google Calendar: Settings → your calendar → <b>Secret address in iCal format</b>. Outlook: Settings → Calendar → Shared calendars → Publish → ICS.</p>
+      <div class="row">
+        <label>Email address<input name="mailUser" placeholder="you@gmail.com" autocomplete="off"></label>
+        <label>App password<input name="mailPass" type="password" id="mailPass" autocomplete="new-password"></label>
+      </div>
+      <p class="hint">Read-only. Gmail: Google Account → Security → 2-Step Verification → <b>App passwords</b>. iCloud and Yahoo work the same way.</p>
+      <label>Mail server (leave empty to detect)<input name="mailHost" placeholder="imap.gmail.com"></label>
+
+      <div class="grp">Spotify</div>
+      <label>Spotify Client ID<input name="spotifyClientId" placeholder="From developer.spotify.com → your app" autocomplete="off"></label>
+      <p class="hint" id="spHint"></p>
+      <div class="acct"><p id="spState">Not connected.</p><button type="button" class="ghost" id="spBtn">Connect</button></div>
+
+      <div class="grp">Updates</div>
+      <label>GitHub token (read-only, while the project is private)<input name="updateToken" type="password" id="updToken" autocomplete="new-password"></label>
+      <p class="hint" id="verHint"></p>
+      <div class="btns"><span class="ok" id="saved"></span><button type="button" class="ghost" id="quit">Quit Jarvis</button><button class="primary">Save</button></div>
+    </form>
+  </section>
+
+  <!-- memory -->
+  <section id="v-memory" hidden>
+    <div class="vh"><h2>What I remember</h2><button class="link" data-close>Done</button></div>
+    <ul class="mem" id="mem"></ul>
+  </section>
+</div>
+<script src="panel.js"></script>
+</body>
+</html>

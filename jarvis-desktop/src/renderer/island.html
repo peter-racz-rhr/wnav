@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https:; connect-src https:; media-src 'self' blob:">
+<title>Jarvis</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="island.css">
+</head>
+<body>
+<div id="island" data-s="idle" role="button" tabindex="0" aria-label="Jarvis. Click to talk, T to type.">
+  <div class="layer" id="lStatus"><div class="status"><span class="light"></span><span class="text" id="statusText"></span><span class="bars" id="bars"><i></i><i></i><i></i><i></i><i></i></span></div></div>
+  <div class="layer" id="lTimer"><div class="split"><svg class="ring" viewBox="0 0 24 24"><circle class="bg" cx="12" cy="12" r="9"/><circle class="fg" id="tRing" cx="12" cy="12" r="9" stroke-dasharray="56.5" stroke-dashoffset="0"/><circle class="head" id="tHead" cx="21" cy="12" r="1.6"/></svg><span class="tval" id="tCompact">0:00</span></div></div>
+  <div class="layer" id="lMusic"><div class="mini"><span class="art" id="mArt"></span><span class="track"><i id="mMini"></i></span><span class="eq"><i></i><i></i><i></i><i></i></span></div><div class="mlyr" id="mLyrMini"></div></div>
+  <div class="layer" id="lHud"><div class="hud"><svg viewBox="0 0 24 24" id="hudIcon"></svg><span class="lvl"><i id="hudLvl"></i></span></div></div>
+  <div class="layer" id="lTask"><div class="task" id="taskRow"></div></div>
+  <div class="layer" id="lMeet"><div class="task" id="meetRow"></div></div>
+  <div class="layer" id="lDl"><div class="task" id="dlRow"></div></div>
+  <div class="layer" id="lNotif"><div class="notif" id="notifRow"></div></div>
+  <span class="count" id="count"></span>
+  <div class="layer" id="lDrop"><div class="drop"><svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>Drop to add to Shelf</div></div>
+  <div class="layer" id="lCard"><div class="w-top" id="wTop" hidden><i></i></div><div class="card" id="card"></div></div>
+</div>
+<div id="peek" aria-hidden="true"></div>
+<div id="bubble" aria-hidden="true"><svg class="ring" viewBox="0 0 24 24"><circle class="bg" cx="12" cy="12" r="9"/><circle class="fg" id="bRing" cx="12" cy="12" r="9" stroke-dasharray="56.5" stroke-dashoffset="0"/><circle class="head" id="bHead" cx="21" cy="12" r="1.6"/></svg></div>
+<div class="sr" aria-live="polite" id="live"></div>
+<form id="typed"><input id="typedIn" placeholder="Type to Jarvis…" autocomplete="off"></form>
+<script src="island.js" defer></script>
+</body>
+</html>

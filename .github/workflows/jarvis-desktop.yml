@@ -1,0 +1,54 @@
+name: Build Jarvis for Windows
+
+on:
+  push:
+    paths: ["jarvis-desktop/**", ".github/workflows/jarvis-desktop.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write   # to publish the installer as a GitHub Release
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: jarvis-desktop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: jarvis-desktop/package-lock.json
+      - run: npm ci
+      - name: Check the app's dependencies load
+        run: node -e "import('@anthropic-ai/sdk').then(()=>import('@huggingface/transformers')).then(()=>import('kokoro-js')).then(()=>console.log('deps ok'))"
+      - name: Build installer .exe
+        run: npx electron-builder --win --x64 --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      - id: version
+        shell: bash
+        run: echo "v=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Jarvis-Windows
+          path: jarvis-desktop/dist/*.exe
+          if-no-files-found: error
+          retention-days: 30
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: jarvis-v${{ steps.version.outputs.v }}
+          target_commitish: ${{ github.sha }}
+          name: Jarvis ${{ steps.version.outputs.v }}
+          body: |
+            **Download `Jarvis-Setup-${{ steps.version.outputs.v }}.exe` below, run it, and follow the setup.**
+            Windows may warn that the app is unsigned: click **More info → Run anyway**.
+
+            Jarvis is a black island at the top of your screen. Click it (or press Alt+J) and ask anything; answers drop down as cards. Flick it up to hide it, pull it down to tear it off into a widget. It runs on your own Claude account (no API key).
+
+            New in 3.2: Allow / Deny Claude Code from the island, other apps' notifications, next meeting with Join, morning briefing, read-only email, clipboard history, smart suggestions, download progress, focus mode, real Spotify control with synced lyrics, and auto-update.
+          files: jarvis-desktop/dist/Jarvis-Setup-*.exe
+          make_latest: true
