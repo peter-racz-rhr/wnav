@@ -612,6 +612,11 @@ J.onMedia((m) => {
   if (same && $("card").dataset.np === "1") { const c = $("card").querySelector(".cover"); if (c) c.style.setProperty("--art", music.art); }
   if (!same && $("card").dataset.np === "1" && cardOpen) render(nowPlaying());
 });
+J.onMediaArt?.(({ key, art }) => {   // a cover found online for the current song
+  if (key !== coverKey || !art || (cover && !cover.includes("https:"))) return;   // Windows' own cover wins
+  cover = coverCss(art);
+  if (music) { music.art = cover; if ($("card").dataset.np === "1") { const c = $("card").querySelector(".cover"); if (c) { c.style.setProperty("--art", cover); c.classList.add("photo"); } } }
+});
 const appName = (id) => /spotify/i.test(id) ? "Spotify" : /chrome|msedge|firefox/i.test(id) ? "Browser" : "Media";
 function musicPos() { return music ? Math.min(music.dur || 0, music.pos + (music.playing ? (performance.now() - music.at) / 1000 : 0)) : 0; }
 function drawMusic() {
@@ -1051,6 +1056,29 @@ J.onShow?.((v) => {
   else if (v === "mail") mailCard().then(show);
   else if (v === "briefing") briefing().then(show);
   else if (v === "notifications") { show(notifCenter()); unread = 0; }
+  else if (v === "cccheck") ccCheck();
+});
+// "Check Claude Code connection": shows what Jarvis sees and runs a live test on request
+async function ccCheck(testResult) {
+  const st = await J.ccStatus();
+  const ago = st.last ? agoShort(st.last) + " ago" : "never";
+  const row = (ok, k, v) => `<li><span class="k" style="color:${ok ? "var(--green)" : "var(--red)"}">${ok ? "✓" : "✕"}</span><span class="v">${esc(k)}${v ? ` · <span style="color:var(--muted)">${esc(v)}</span>` : ""}</span></li>`;
+  const rows = [
+    row(st.enabled, "Showing Claude Code sessions is on"),
+    row(st.claude, "Claude Code is installed"),
+    row(st.installed, "Jarvis's hooks are in Claude Code's settings", st.form),
+    row(st.listening, "Jarvis is listening for them"),
+    row(st.count > 0, "Events received", st.count ? `${st.count}, last ${ago} (${st.lastEvent})` : "none yet"),
+  ];
+  if (testResult) rows.push(row(testResult.ok, "Live test", testResult.ok ? `${testResult.got} events came through` : `nothing came through (exit ${testResult.code}) ${testResult.output || ""}`));
+  show({ icon: "claude", kicker: "Claude Code connection", stay: true,
+    title: testResult ? (testResult.ok ? "It works." : "The test didn't reach Jarvis.") : st.count ? "Events are arriving." : "No events yet.",
+    html: `<ul class="list">${rows.join("")}</ul>`,
+    note: "This follows Claude Code: the Code tab of the Claude app, the terminal and VS Code. Sessions started before Jarvis installed its hooks need a restart. Ordinary Claude chats don't report to other apps.",
+    chips: [{ label: testResult ? "Test again" : "Run a live test", run: async () => { show({ icon: "claude", kicker: "Claude Code connection", title: "Testing…", body: "Running one tiny Claude Code task. It takes a few seconds." }); ccCheck(await J.ccTest()); } }] });
+}
+J.onShow?.((v) => {
+  if (v !== "cccheck-noop") return;
 });
 
 // ---------------- start ----------------

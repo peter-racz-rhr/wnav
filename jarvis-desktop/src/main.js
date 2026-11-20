@@ -59,6 +59,7 @@ const DEFAULTS = {
   morningBriefing: true,
   autoUpdate: true,
   autoHideFullscreen: true,
+  autoHideApps: "chrome",   // tuck away only over these apps (process names, comma separated)
   browserMedia: false,      // show media playing in a browser too (off: YouTube videos don't pop up as music) // tuck into a bump when a full-screen or maximized app is under the island
   city: "",
   icalUrl: "",              // private iCal link of the user's calendar
@@ -200,6 +201,7 @@ ipcMain.on("island:menu", () => {
     { label: "Email", click: () => send("island:show", "mail") },
     { label: "Clipboard", click: () => send("island:show", "clipboard") },
     { label: "Notifications", click: () => send("island:show", "notifications") },
+    { label: "Check Claude Code connection", click: () => send("island:show", "cccheck") },
     { type: "separator" },
     { label: "Hide / show island", click: () => send("island:toggleHide") },
     { label: dock === "top" ? "Float as widget" : "Dock to top", click: () => (dock === "top" ? toWidget() : toDock()) },
@@ -298,6 +300,26 @@ while ($true) {
 let mediaProc = null, lastMedia = "", lastArtErr = null;
 // small diagnostics log in %APPDATA%/Jarvis/jarvis.log (no personal content)
 function logLine(area, msg) { fs.appendFile(path.join(USER_DIR(), "jarvis.log"), `${new Date().toISOString()} [${area}] ${msg}\n`).catch(() => {}); }
+// Album covers from Spotify itself (when connected) or Apple's public music catalogue (title + artist only).
+let artKey = "";
+const artCache = new Map();
+async function lookupArt(m) {
+  if (artCache.has(m.key)) return artCache.get(m.key);
+  let url = "";
+  try {
+    if (/spotify/i.test(m.app || "") && spotify?.connected) { const c = await spotify.current().catch(() => null); if (c?.art) url = c.art; }
+    if (!url && m.title) {
+      const q = encodeURIComponent(`${m.title} ${m.artist || ""}`.trim());
+      const j = await fetch(`https://itunes.apple.com/search?term=${q}&entity=song&limit=5`).then((r) => r.json());
+      const t = m.title.toLowerCase(), hit = j.results?.find((x) => (x.trackName || "").toLowerCase() === t) || j.results?.[0];
+      if (hit?.artworkUrl100) url = hit.artworkUrl100.replace(/\d+x\d+bb/, "600x600bb");
+    }
+  } catch (e) { logLine("media", `cover lookup: ${e.message}`); }
+  if (url) logLine("media", "cover: found online");
+  artCache.set(m.key, url);
+  if (artCache.size > 200) artCache.delete(artCache.keys().next().value);
+  return url;
+}
 function startMediaWatch() {
   if (!IS_WIN || mediaProc) return;
   const encoded = Buffer.from(MEDIA_PS, "utf16le").toString("base64");
@@ -314,6 +336,11 @@ function startMediaWatch() {
         const m = JSON.parse(line);
         if ((m.artErr || "") !== lastArtErr) { lastArtErr = m.artErr || ""; logLine("media", lastArtErr ? `cover: ${lastArtErr} (${m.app})` : `cover: ok (${m.app})`); }
         send("media:now", m);
+        if (m.key && m.key !== artKey) {   // new song: find a cover on the web too (Windows often hands over none)
+          artKey = m.key;
+          const key = m.key;
+          lookupArt(m).then((art) => { if (art && key === artKey) send("media:art", { key, art }); });
+        }
       } catch {}
     }
   });
@@ -340,12 +367,13 @@ public static class JFg {
 }
 '@
 [JFg]::SetProcessDpiAwarenessContext([IntPtr](-4)) | Out-Null
-$last = ''
+$last = ''; $lastPid = 0; $pn = ''
 while ($true) {
   $h = [JFg]::GetForegroundWindow(); $r = New-Object JFg+R; $p = [uint32]0
   [JFg]::GetWindowRect($h, [ref]$r) | Out-Null; [JFg]::GetWindowThreadProcessId($h, [ref]$p) | Out-Null
   $sb = New-Object System.Text.StringBuilder 64; [JFg]::GetClassName($h, $sb, 64) | Out-Null
-  $line = '{0},{1},{2},{3},{4},{5},{6}' -f $r.L, $r.T, $r.Rt, $r.B, $p, [int][JFg]::IsZoomed($h), $sb.ToString()
+  if ($p -ne $lastPid) { $lastPid = $p; $pn = (Get-Process -Id $p -ErrorAction SilentlyContinue).ProcessName }
+  $line = '{0},{1},{2},{3},{4},{5},{6},{7}' -f $r.L, $r.T, $r.Rt, $r.B, $p, [int][JFg]::IsZoomed($h), $sb.ToString(), $pn
   if ($line -ne $last) { $last = $line; [Console]::Out.WriteLine($line); [Console]::Out.Flush() }
   Start-Sleep -Milliseconds 400
 }`;
@@ -360,7 +388,7 @@ function startFullscreenWatch() {
     buf += d; let i;
     while ((i = buf.indexOf("\n")) >= 0) {
       const line = buf.slice(0, i).trim(); buf = buf.slice(i + 1);
-      const [l, t, r, b, pid, , cls] = line.split(",");
+      const [l, t, r, b, pid, , cls, proc = ""] = line.split(",");
       if (cls === undefined) continue;
       if (+pid === process.pid || /^(Progman|WorkerW|Shell_TrayWnd|Shell_SecondaryTrayWnd|Windows\.UI\.Core\.CoreWindow|XamlExplorerHostIslandWindow|TopLevelWindowForOverflowXamlIsland)$/.test(cls)) {
         if (+pid !== process.pid) setAutoHidden(false);   // desktop, taskbar, Start: show the island
@@ -372,7 +400,9 @@ function startFullscreenWatch() {
       const d = screen.getDisplayMatching(ib), cx = ib.x + ib.width / 2;
       // covers the top edge around the island, and is big (maximized or full screen)
       const covers = rect.y <= d.workArea.y + 12 && rect.x <= cx - 120 && rect.x + rect.width >= cx + 120 && rect.height >= d.workArea.height * .7;
-      setAutoHidden(covers);
+      // only for the apps you chose (Chrome by default): everything else leaves the island alone
+      const apps = String(settings.autoHideApps || "chrome").toLowerCase().split(/[,\s]+/).map((x) => x.replace(/\.exe$/, "")).filter(Boolean);
+      setAutoHidden(covers && apps.includes(proc.toLowerCase()));
     }
   });
   fgProc.on("exit", (code) => { logLine("fullscreen", `watcher stopped (${code})`); fgProc = null; setAutoHidden(false); });
@@ -409,6 +439,40 @@ function answerPerm(id, decision, message) {
   send("cc:permDone", { id, decision });
 }
 ipcMain.on("cc:permAnswer", (_e, { id, decision }) => answerPerm(id, decision));
+// ---- "Check Claude Code connection": are the hooks in place, do events arrive, and a one-click live test
+const hookStats = { last: 0, count: 0, lastEvent: "" };
+ipcMain.handle("cc:status", async () => {
+  const file = path.join(os.homedir(), ".claude", "settings.json");
+  let installed = false, form = "";
+  try {
+    const cfg = JSON.parse(await fs.readFile(file, "utf8"));
+    const h = cfg.hooks?.PreToolUse?.flatMap((g) => g.hooks || []).find((x) => isJarvisHook(x, "/cc-hook/"));
+    installed = !!h; form = h ? (h.args ? "direct (curl.exe)" : "shell") : "";
+  } catch {}
+  return { enabled: !!settings.claudeActivity, installed, form, file, listening: !!hookServer?.listening, ...hookStats, claude: !!(await findClaude()) };
+});
+// Runs a tiny Claude Code task (one quick question, the smallest model) and reports whether its events reached Jarvis.
+ipcMain.handle("cc:test", async () => {
+  const bin = await findClaude();
+  if (!bin) return { ok: false, why: "Claude Code isn't installed." };
+  if (!settings.claudeActivity) await (settings.claudeActivity = true, setClaudeHooks(true));
+  const before = hookStats.count;
+  const out = await new Promise((resolve) => {
+    const env = { ...process.env }; delete env.ANTHROPIC_API_KEY;   // use the Claude account, like the user's own sessions
+    const args = ["-p", "Reply with just the word OK.", "--model", "claude-haiku-5-5"];
+    const p = /\.(cmd|bat)$/i.test(bin)
+      ? spawn("cmd.exe", ["/d", "/s", "/c", [`"${bin}"`, ...args.map((a) => `"${a}"`)].join(" ")], { cwd: os.homedir(), env, windowsHide: true, windowsVerbatimArguments: true, stdio: ["ignore", "pipe", "pipe"] })
+      : spawn(bin, args, { cwd: os.homedir(), env, windowsHide: true, stdio: ["ignore", "pipe", "pipe"] });
+    let o = ""; p.stdout.on("data", (d) => (o += d)); p.stderr.on("data", (d) => (o += d));
+    const t = setTimeout(() => p.kill(), 90e3);
+    p.on("close", (code) => { clearTimeout(t); resolve({ code, o: o.trim().slice(0, 300) }); });
+    p.on("error", (e) => { clearTimeout(t); resolve({ code: -1, o: e.message }); });
+  });
+  await new Promise((r) => setTimeout(r, 800));
+  const got = hookStats.count - before;
+  logLine("hooks", `test: claude exit ${out.code}, ${got} events received`);
+  return { ok: got > 0, got, code: out.code, output: out.o };
+});
 // Token use per session, read from the session's transcript (each assistant message carries its usage).
 // Read incrementally from where we stopped, so it stays cheap on long sessions.
 const hookSeen = new Set(), usageBySession = new Map();
@@ -475,6 +539,7 @@ function startHookListener() {
       let j; try { j = JSON.parse(body); } catch { return; }
       if (cc?.sessionId && j.session_id === cc.sessionId) return;   // Jarvis's own background Claude: already shown
       const cwd = j.cwd || "";
+      hookStats.last = Date.now(); hookStats.count++; hookStats.lastEvent = m[1];
       if (!hookSeen.has(j.session_id)) { hookSeen.add(j.session_id); logLine("hooks", `receiving events from a Claude Code session (${m[1]})`); }
       const usage = sessionUsage(j.session_id, j.transcript_path);
       send("cc:event", { tokens: usage.tokens, model: usage.model,

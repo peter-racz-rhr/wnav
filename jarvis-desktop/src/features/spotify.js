@@ -94,7 +94,7 @@ export class Spotify {
   }
   async current() {
     const c = await this.api("GET", "/me/player/currently-playing");
-    return c?.item ? { id: c.item.id, uri: c.item.uri, title: c.item.name, artist: c.item.artists?.map((a) => a.name).join(", "), artistUri: c.item.artists?.[0]?.uri, artistName: c.item.artists?.[0]?.name } : null;
+    return c?.item ? { id: c.item.id, uri: c.item.uri, title: c.item.name, artist: c.item.artists?.map((a) => a.name).join(", "), artistUri: c.item.artists?.[0]?.uri, artistName: c.item.artists?.[0]?.name, art: c.item.album?.images?.[0]?.url || "" } : null;
   }
   async like() { const c = await this.current(); if (!c) return null; await this.api("PUT", `/me/tracks?ids=${c.id}`); return c; }
   async addToPlaylist(name) {
